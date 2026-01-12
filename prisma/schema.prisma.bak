@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  BUSINESS
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  phone     String?
+  role      Role     @default(USER)
+
+  // ✅ Email verification
+  emailVerified              Boolean   @default(false)
+  emailVerificationToken     String?
+  emailVerificationExpiresAt DateTime?
+
+  venues        Venue[]
+  reservations Reservation[]
+  reviews       Review[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model Venue {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  city        String
+  category    String
+  address     String?
+  ownerId     String
+
+  owner         User         @relation(fields: [ownerId], references: [id])
+  media         Media[]
+  reservations Reservation[]
+  reviews       Review[]
+
+  createdAt DateTime @default(now())
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  url       String
+  type      String   // image | video | pdf
+  venueId   String
+
+  venue     Venue    @relation(fields: [venueId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Reservation {
+  id        String   @id @default(cuid())
+  venueId   String
+  userId    String
+  dateTime  DateTime
+  status    String   // PENDING | ACCEPTED | DECLINED | CHECKED_IN
+  qrToken   String   @unique
+
+  venue Venue @relation(fields: [venueId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Review {
+  id       String   @id @default(cuid())
+  rating   Int
+  comment  String?
+  venueId  String
+  userId   String
+
+  venue Venue @relation(fields: [venueId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}

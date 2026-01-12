@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                         String        @id @default(cuid())
+  email                      String        @unique
+  password                   String
+  name                       String?
+  phone                      String?
+  role                       Role          @default(USER)
+  createdAt                  DateTime      @default(now())
+  emailVerificationExpiresAt DateTime?
+  emailVerificationToken     String?
+  emailVerified              Boolean       @default(false)
+  updatedAt                  DateTime      @default(now()) @updatedAt
+  reservations               Reservation[]
+  reviews                    Review[]
+  venues                     Venue[]
+}
+
+model Venue {
+  id                  String        @id @default(cuid())
+  name                String
+  // Identity
+  tagline             String?
+  description         String?
+  category            String?
+  email               String?
+
+  // Location
+  address             String
+  city                String
+  neighborhood        String?
+  locationUrl         String?
+  lat                 Float?
+  lng                 Float?
+
+  // Contact & Socials
+  phone               String?
+  whatsapp            String?
+  website             String?
+  instagram           String?
+  tiktok              String?
+
+  // Status & Access
+  status              VenueStatus   @default(DRAFT)
+  ownerId             String
+  venueTypeId         Int?
+  
+  approvedAt          DateTime?
+  approvedBy          String?
+  
+  // Facilities
+  parkingAvailable    Boolean       @default(false)
+  valetParking        Boolean       @default(false)
+  amenities           String[]      // Array of strings for tags (WiFi, etc.)
+
+  // Policies (Structured)
+  reservationPolicy   String?       // walk-in, reservation, both
+  cancelationPolicy   String?
+  paymentMethods      String[]
+  dressCode           String?
+  agePolicy           String?
+  entryPolicy         String?       // free, paid, guestlist
+  minSpendPolicy      String?
+
+  // Legacy/Other
+  reservationsEnabled Boolean       @default(true)
+  openingHours        String?
+  weeklySchedule      Json?
+  startDate           DateTime?
+  endDate             DateTime?
+  media               Media[]
+  reservations        Reservation[]
+  reviews             Review[]
+  owner               User          @relation(fields: [ownerId], references: [id])
+  venueType           VenueType?    @relation(fields: [venueTypeId], references: [id])
+  attributes          VenueAttribute[]
+  events              Event[]
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  url       String
+  type      String
+  venueId   String
+  createdAt DateTime @default(now())
+  venue     Venue    @relation(fields: [venueId], references: [id])
+}
+
+model Reservation {
+  id        String   @id @default(cuid())
+  venueId   String
+  userId    String
+  dateTime  DateTime
+  status    String
+  qrToken   String   @unique
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  venue     Venue    @relation(fields: [venueId], references: [id])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int
+  comment   String?
+  venueId   String
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  venue     Venue    @relation(fields: [venueId], references: [id])
+}
+
+model VenueType {
+  id                  Int     @id @default(autoincrement())
+  category_code       String
+  category_name_en    String
+  category_name_fr    String
+  category_name_ar    String
+  subcategory_code    String
+  subcategory_name_en String
+  subcategory_name_fr String
+  subcategory_name_ar String
+  icon                String
+  is_active           Boolean @default(true)
+  venues              Venue[]
+
+  @@unique([category_code, subcategory_code])
+}
+
+enum Role {
+  USER
+  BUSINESS
+  ADMIN
+}
+
+enum VenueStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model VenueTypeField {
+  id               Int     @id @default(autoincrement())
+  subcategory_code String
+  
+  field_key        String
+  field_type       String  // text, number, boolean, single_select, multi_select, range
+  
+  label_en         String
+  label_fr         String
+  label_ar         String
+  
+  required         Boolean @default(false)
+  options          Json?   // Array of { value, label_en, label_fr, label_ar }
+  sort_order       Int     @default(0)
+  is_active        Boolean @default(true)
+
+  @@unique([subcategory_code, field_key])
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  date        DateTime
+  startTime   String?
+  endTime     String?
+  venueId     String
+  mediaUrl    String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  venue       Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+}
+
+model VenueAttribute {
+  id        String   @id @default(cuid())
+  venueId   String
+  field_key String
+  value_json Json    // Stores the actual value
+
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, field_key])
+}

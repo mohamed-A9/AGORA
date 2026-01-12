@@ -1,0 +1,76 @@
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import Link from "next/link";
+
+export default async function DashboardPage() {
+  const session = await getServerSession(authOptions);
+  const role = (session as any)?.user?.role as "USER" | "BUSINESS" | "ADMIN" | undefined;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-7 shadow-2xl">
+        <h1 className="text-3xl font-extrabold tracking-tight">Dashboard</h1>
+        <p className="mt-2 text-white/70">
+          Bienvenue {session?.user?.name || session?.user?.email} — rôle:{" "}
+          <span className="font-semibold text-white">{role}</span>
+        </p>
+      </div>
+
+      {role === "BUSINESS" ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card
+            title="Publier un Venue / Restaurant"
+            desc="Crée et gère tes lieux, photos, infos, disponibilité."
+            cta="Créer un venue"
+            href="/dashboard/venues/new"
+          />
+          <Card
+            title="Mes réservations reçues"
+            desc="Consulte les réservations faites sur tes lieux."
+            cta="Voir réservations"
+            href="/dashboard/bookings"
+          />
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card
+            title="Explorer & réserver"
+            desc="Trouve des lieux et fais une réservation en 1 minute."
+            cta="Explorer"
+            href="/venues"
+          />
+          <Card
+            title="Mes réservations"
+            desc="Historique, statut, annulation si tu ajoutes."
+            cta="Voir mes réservations"
+            href="/dashboard/my-reservations"
+          />
+        </div>
+      )}
+
+      {(role === "ADMIN") && (
+        <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-6">
+          <div className="text-lg font-semibold">Zone Admin</div>
+          <p className="text-white/70 mt-1">Accès à la gestion des utilisateurs & contenu.</p>
+          <Link className="mt-4 inline-block rounded-2xl bg-white text-black px-4 py-2 font-semibold" href="/admin">
+            Aller à Admin
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Card({ title, desc, cta, href }: { title: string; desc: string; cta: string; href: string }) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-6 shadow-2xl">
+      <div className="text-xl font-bold">{title}</div>
+      <p className="mt-2 text-white/70">{desc}</p>
+      <Link className="mt-5 inline-block rounded-2xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-400 px-4 py-2 font-semibold"
+        href={href}
+      >
+        {cta}
+      </Link>
+    </div>
+  );
+}

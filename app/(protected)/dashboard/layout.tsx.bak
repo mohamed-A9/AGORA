@@ -1,0 +1,37 @@
+import { requireAuth } from "@/lib/guard";
+
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await requireAuth();
+  const user = (session as any).user;
+
+  return (
+    <div className="min-h-screen flex">
+      {/* Sidebar */}
+      <aside className="w-64 border-r p-6">
+        <div className="text-3xl font-extrabold">AGORA</div>
+
+        <nav className="mt-8 space-y-3">
+          <a className="block" href="/dashboard">Dashboard</a>
+          <a className="block" href="/profile">Profil</a>
+
+          {user?.role === "ADMIN" && (
+            <a className="block" href="/admin">Admin</a>
+          )}
+
+          <a className="block text-red-600" href="/logout">
+            Déconnexion
+          </a>
+        </nav>
+      </aside>
+
+      {/* Content */}
+      <main className="flex-1 p-6 bg-gray-50">
+        {children}
+      </main>
+    </div>
+  );
+}

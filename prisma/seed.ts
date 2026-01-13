@@ -874,7 +874,7 @@ async function main() {
             name: 'Demo Business',
             role: 'BUSINESS',
             password: 'password123', // In real app this should be hashed
-            emailVerified: true
+            emailVerified: new Date()
         }
     });
 

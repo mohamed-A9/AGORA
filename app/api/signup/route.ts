@@ -38,7 +38,7 @@ export async function POST(req: Request) {
         name,
         phone,
         role,
-        emailVerified: false,
+        emailVerified: null,
         emailVerificationToken,
         emailVerificationExpiresAt,
       },

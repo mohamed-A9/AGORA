@@ -68,7 +68,7 @@ export async function updateVenue(formData: FormData) {
 
     try {
         // Transaction to update details and media
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: any) => {
             // Update basic fields
             await tx.venue.update({
                 where: { id: data.id },

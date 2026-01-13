@@ -2,28 +2,31 @@
 
 import { useState } from "react";
 import { updateVenueStep } from "@/actions/venue";
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import { DRESS_CODES, AGE_POLICIES, PAYMENT_METHODS } from "@/lib/constants";
 
 export default function DetailsStep({ venueId, onNext, onBack, initialData }: { venueId: string, onNext: (data: any) => void, onBack: () => void, initialData?: any }) {
     const [isLoading, setIsLoading] = useState(false);
 
-    // Contact
-    const [phone, setPhone] = useState("");
-    const [website, setWebsite] = useState("");
-    const [instagram, setInstagram] = useState("");
+    // Contact - Initialize from initialData
+    const [phone, setPhone] = useState(initialData?.phone || "");
+    const [website, setWebsite] = useState(initialData?.website || "");
+    const [instagram, setInstagram] = useState(initialData?.instagram || "");
 
-    // Policies
-    const [dressCode, setDressCode] = useState("");
-    const [agePolicy, setAgePolicy] = useState("");
-    const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
+    // Policies - Initialize from initialData
+    const [dressCode, setDressCode] = useState(initialData?.dressCode || "");
+    const [agePolicy, setAgePolicy] = useState(initialData?.agePolicy || "");
 
-    // Facilities
+    // Ensure paymentMethods is an array
+    const [paymentMethods, setPaymentMethods] = useState<string[]>(
+        Array.isArray(initialData?.paymentMethods) ? initialData.paymentMethods : []
+    );
+
+    // Facilities - Initialize from initialData
     const [parkingAvailable, setParkingAvailable] = useState(initialData?.parkingAvailable || false);
     const [valetParking, setValetParking] = useState(initialData?.valetParking || false);
     const [reservationsEnabled, setReservationsEnabled] = useState(initialData?.reservationsEnabled !== false); // Default true
-
-    // Constants - from @/lib/constants
-    // DRESS_CODES, AGE_POLICIES, PAYMENT_METHODS imported
 
     const togglePaymentMethod = (method: string) => {
         if (paymentMethods.includes(method)) {
@@ -42,7 +45,7 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
             instagram,
             dressCode,
             agePolicy,
-            paymentMethods, // Array of strings, handled by generic update if schema matches
+            paymentMethods,
             parkingAvailable,
             valetParking,
             reservationsEnabled
@@ -74,7 +77,13 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                         <label className="text-sm text-zinc-400">Phone Number</label>
-                        <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+212 6..." className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                        <PhoneInput
+                            international
+                            defaultCountry="MA"
+                            value={phone}
+                            onChange={(value) => setPhone(value as string)}
+                            className="bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus-within:ring-2 focus-within:ring-indigo-600 outline-none w-full flex gap-2 phone-input-dark"
+                        />
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm text-zinc-400">Website</label>
@@ -98,14 +107,20 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
                         <label className="text-sm text-zinc-400">Dress Code</label>
                         <select value={dressCode} onChange={e => setDressCode(e.target.value)} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
                             <option value="">Select Dress Code...</option>
-                            {DRESS_CODES.map(c => <option key={c} value={c}>{c}</option>)}
+                            <option value="Casual">Casual</option>
+                            <option value="Smart Casual">Smart Casual</option>
+                            <option value="Formal">Formal</option>
+                            <option value="Beachwear">Beachwear</option>
                         </select>
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm text-zinc-400">Age Policy</label>
                         <select value={agePolicy} onChange={e => setAgePolicy(e.target.value)} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
                             <option value="">Select Age Policy...</option>
-                            {AGE_POLICIES.map(p => <option key={p} value={p}>{p}</option>)}
+                            <option value="All Ages">All Ages</option>
+                            <option value="18+">18+</option>
+                            <option value="21+">21+</option>
+                            <option value="Family Friendly">Family Friendly</option>
                         </select>
                     </div>
                 </div>
@@ -174,5 +189,13 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
                     </button>
                 </div>
             </div>
-        </div>);
+
+            <style jsx global>{`
+                .phone-input-dark .PhoneInputCountry { margin-right: 10px; }
+                .phone-input-dark .PhoneInputCountrySelect { color: black; }
+                .phone-input-dark input { background: transparent; border: none; outline: none; color: white; width: 100%; }
+                .phone-input-dark input::placeholder { color: #52525b; }
+            `}</style>
+        </div>
+    );
 }

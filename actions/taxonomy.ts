@@ -9,7 +9,7 @@ export async function getVenueTypes(lang: "en" | "fr" | "ar" = "en") {
     });
 
     // Group by category
-    const grouped = types.reduce((acc, type) => {
+    const grouped = types.reduce((acc: Record<string, any>, type: any) => {
         const catCode = type.category_code;
         if (!acc[catCode]) {
             acc[catCode] = {

@@ -865,6 +865,74 @@ async function main() {
         await seedFieldsForSubcategories(musicEventSubcodes, [musicField])
     }
 
+    // Seed sample user
+    const user = await prisma.user.upsert({
+        where: { email: 'demo@agora.com' },
+        update: {},
+        create: {
+            email: 'demo@agora.com',
+            name: 'Demo Business',
+            role: 'BUSINESS',
+            password: 'password123', // In real app this should be hashed
+            emailVerified: true
+        }
+    });
+
+    // Seed Sample Venues
+    const sampleVenues = [
+        {
+            name: "Le Cabestan",
+            description: "Luxury oceanfront dining experience.",
+            city: "Casablanca",
+            category: "Restaurant",
+            address: "90 Boulevard de la Corniche",
+            parkingAvailable: true,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Formal",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id
+        },
+        {
+            name: "Sky 28",
+            description: "Rooftop bar with panoramic views.",
+            city: "Casablanca",
+            category: "Bar",
+            address: "Twin Center, Boulevard Zerktouni",
+            parkingAvailable: true,
+            valetParking: false,
+            reservationsEnabled: true,
+            dressCode: "Smart Casual",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id
+        },
+        {
+            name: "Rick's Café",
+            description: "A romantic restaurant bar designed to recreate the bar made famous by Humphrey Bogart and Ingrid Bergman in the movie classic Casablanca.",
+            city: "Casablanca",
+            category: "Restaurant",
+            address: "248 Boulevard Sour Jdid",
+            parkingAvailable: false,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Smart Casual",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id
+        }
+    ];
+
+    for (const v of sampleVenues) {
+        // @ts-ignore
+        const existing = await prisma.venue.findFirst({ where: { name: v.name } });
+        if (!existing) {
+            // @ts-ignore
+            await prisma.venue.create({ data: v });
+        }
+    }
+
     console.log('✅ Seeding finished.')
 }
 

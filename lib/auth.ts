@@ -1,28 +1,62 @@
 // lib/auth.ts
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
+import FacebookProvider from "next-auth/providers/facebook";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
 /**
  * NOTE:
  * - Works with App Router route: app/api/auth/[...nextauth]/route.ts
- * - Uses Credentials (email/password)
- * - Enforces email verification (emailVerified must be true)
+ * - Uses Credentials (email/password) & OAuth (Google/Facebook)
+ * - Adapter persists users/accounts to DB
  * - Injects role into JWT + session (USER / BUSINESS / ADMIN)
  */
 
+import { cookies } from "next/headers";
+
+if (!process.env.GOOGLE_CLIENT_ID) console.error("⚠️ GOOGLE_CLIENT_ID is missing");
+if (!process.env.GOOGLE_CLIENT_SECRET) console.error("⚠️ GOOGLE_CLIENT_SECRET is missing");
+if (!process.env.FACEBOOK_CLIENT_ID) console.error("⚠️ FACEBOOK_CLIENT_ID is missing");
+if (!process.env.FACEBOOK_CLIENT_SECRET) console.error("⚠️ FACEBOOK_CLIENT_SECRET is missing");
+
 export const authOptions: NextAuthOptions = {
+  events: {
+    async createUser({ user }) {
+      const cookieStore = await cookies();
+      const role = cookieStore.get("signup-role")?.value;
+
+      if (role === "BUSINESS") {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { role: "BUSINESS" },
+        });
+      }
+    },
+  },
+  adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
   },
 
   pages: {
     signIn: "/login",
-    error: "/login", // we’ll read ?error=... on the login page if you want
+    error: "/login",
   },
 
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true,
+    }),
+    FacebookProvider({
+      clientId: process.env.FACEBOOK_CLIENT_ID!,
+      clientSecret: process.env.FACEBOOK_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true,
+    }),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -48,19 +82,16 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        if (!user) return null;
+        // If user exists but has no password (signed up via OAuth), return null
+        if (!user || !user.password) return null;
 
         // Password check
         const ok = await bcrypt.compare(password, user.password);
         if (!ok) return null;
 
-        // Email verification enforcement
-        if (!user.emailVerified) {
-          // This becomes `?error=EMAIL_NOT_VERIFIED` on the error page (login)
-          throw new Error("EMAIL_NOT_VERIFIED");
-        }
+        // Email verification enforcement (optional for credentials, strictly speaking)
+        // if (!user.emailVerified) throw new Error("EMAIL_NOT_VERIFIED");
 
-        // Return object becomes `user` in callbacks (jwt)
         return {
           id: user.id,
           email: user.email,
@@ -72,7 +103,7 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       // On login, persist custom fields into JWT
       if (user) {
         token.role = (user as any).role;

@@ -122,128 +122,118 @@ export default function EditVenuePage() {
                         <form id="edit-form" onSubmit={handleSubmit} className="space-y-6">
 
                             {/* BASICS */}
-                            {activeTab === "basics" && (
-                                <div className="space-y-6">
+                            <div className={activeTab === "basics" ? "space-y-6" : "hidden"}>
+                                <div className="space-y-2">
+                                    <label className="text-sm text-zinc-400">Venue Name</label>
+                                    <input name="name" defaultValue={formData.name} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm text-zinc-400">Tagline</label>
+                                    <input name="tagline" defaultValue={formData.tagline} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm text-zinc-400">Category</label>
+                                    <select name="category" defaultValue={formData.category} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
+                                        <option value="Restaurant">Restaurant</option>
+                                        <option value="Club">Club</option>
+                                        <option value="Bar">Bar</option>
+                                        <option value="Lounge">Lounge</option>
+                                        <option value="Cafe">Cafe</option>
+                                        <option value="Rooftop">Rooftop</option>
+                                        <option value="Event Space">Event Space</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm text-zinc-400">Description</label>
+                                    <textarea name="description" defaultValue={formData.description} rows={5} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                </div>
+                            </div>
+
+                            {/* LOCATION */}
+                            <div className={activeTab === "location" ? "space-y-6" : "hidden"}>
+                                <div className="space-y-2">
+                                    <label className="text-sm text-zinc-400">Address</label>
+                                    <input name="address" defaultValue={formData.address} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <label className="text-sm text-zinc-400">Venue Name</label>
-                                        <input name="name" defaultValue={formData.name} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                        <label className="text-sm text-zinc-400">City</label>
+                                        <input name="city" defaultValue={formData.city} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm text-zinc-400">Tagline</label>
-                                        <input name="tagline" defaultValue={formData.tagline} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                        <label className="text-sm text-zinc-400">Neighborhood</label>
+                                        <input name="neighborhood" defaultValue={formData.neighborhood} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm text-zinc-400">Google Maps URL</label>
+                                    <input name="locationUrl" defaultValue={formData.locationUrl} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                </div>
+                            </div>
+
+                            {/* OPERATIONS */}
+                            <div className={activeTab === "operations" ? "space-y-6" : "hidden"}>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm text-zinc-400">Phone</label>
+                                        <input name="phone" defaultValue={formData.phone} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm text-zinc-400">Category</label>
-                                        <select name="category" defaultValue={formData.category} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
-                                            <option value="Restaurant">Restaurant</option>
-                                            <option value="Club">Club</option>
-                                            <option value="Bar">Bar</option>
-                                            <option value="Lounge">Lounge</option>
-                                            <option value="Cafe">Cafe</option>
-                                            <option value="Rooftop">Rooftop</option>
-                                            <option value="Event Space">Event Space</option>
+                                        <label className="text-sm text-zinc-400">Website</label>
+                                        <input name="website" defaultValue={formData.website} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm text-zinc-400">Opening Hours (Display Text)</label>
+                                    <input name="openingHours" defaultValue={formData.openingHours} placeholder="e.g. Daily 9am - 11pm" className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                </div>
+                                <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
+                                    <input type="checkbox" name="reservationsEnabled" defaultChecked={formData.reservationsEnabled !== false} className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
+                                    <label className="text-white font-medium">Enable Reservations</label>
+                                </div>
+                            </div>
+
+                            {/* DETAILS */}
+                            <div className={activeTab === "details" ? "space-y-6" : "hidden"}>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm text-zinc-400">Dress Code</label>
+                                        <select name="dressCode" defaultValue={formData.dressCode || ""} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
+                                            <option value="">None</option>
+                                            <option value="Casual">Casual</option>
+                                            <option value="Smart Casual">Smart Casual</option>
+                                            <option value="Formal">Formal</option>
+                                            <option value="Beachwear">Beachwear</option>
                                         </select>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm text-zinc-400">Description</label>
-                                        <textarea name="description" defaultValue={formData.description} rows={5} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                        <label className="text-sm text-zinc-400">Age Policy</label>
+                                        <select name="agePolicy" defaultValue={formData.agePolicy || ""} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
+                                            <option value="">None</option>
+                                            <option value="All Ages">All Ages</option>
+                                            <option value="18+">18+</option>
+                                            <option value="21+">21+</option>
+                                            <option value="Family Friendly">Family Friendly</option>
+                                        </select>
                                     </div>
                                 </div>
-                            )}
-
-                            {/* LOCATION */}
-                            {activeTab === "location" && (
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-sm text-zinc-400">Address</label>
-                                        <input name="address" defaultValue={formData.address} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                <div className="flex gap-6 pt-2">
+                                    <div className="flex items-center gap-3 bg-white/5 px-4 py-3 rounded-xl border border-white/10 flex-1">
+                                        <input type="checkbox" name="parkingAvailable" defaultChecked={formData.parkingAvailable} className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
+                                        <label className="text-white font-medium">Parking Available</label>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-sm text-zinc-400">City</label>
-                                            <input name="city" defaultValue={formData.city} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm text-zinc-400">Neighborhood</label>
-                                            <input name="neighborhood" defaultValue={formData.neighborhood} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm text-zinc-400">Google Maps URL</label>
-                                        <input name="locationUrl" defaultValue={formData.locationUrl} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                    <div className="flex items-center gap-3 bg-white/5 px-4 py-3 rounded-xl border border-white/10 flex-1">
+                                        <input type="checkbox" name="valetParking" defaultChecked={formData.valetParking} className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
+                                        <label className="text-white font-medium">Valet Parking</label>
                                     </div>
                                 </div>
-                            )}
-
-                            {/* OPERATIONS */}
-                            {activeTab === "operations" && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-sm text-zinc-400">Phone</label>
-                                            <input name="phone" defaultValue={formData.phone} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm text-zinc-400">Website</label>
-                                            <input name="website" defaultValue={formData.website} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm text-zinc-400">Opening Hours (Display Text)</label>
-                                        <input name="openingHours" defaultValue={formData.openingHours} placeholder="e.g. Daily 9am - 11pm" className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
-                                    </div>
-                                    <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
-                                        <input type="checkbox" name="reservationsEnabled" defaultChecked={formData.reservationsEnabled !== false} className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
-                                        <label className="text-white font-medium">Enable Reservations</label>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* DETAILS */}
-                            {activeTab === "details" && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-sm text-zinc-400">Dress Code</label>
-                                            <select name="dressCode" defaultValue={formData.dressCode || ""} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
-                                                <option value="">None</option>
-                                                <option value="Casual">Casual</option>
-                                                <option value="Smart Casual">Smart Casual</option>
-                                                <option value="Formal">Formal</option>
-                                                <option value="Beachwear">Beachwear</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm text-zinc-400">Age Policy</label>
-                                            <select name="agePolicy" defaultValue={formData.agePolicy || ""} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
-                                                <option value="">None</option>
-                                                <option value="All Ages">All Ages</option>
-                                                <option value="18+">18+</option>
-                                                <option value="21+">21+</option>
-                                                <option value="Family Friendly">Family Friendly</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-6 pt-2">
-                                        <div className="flex items-center gap-3 bg-white/5 px-4 py-3 rounded-xl border border-white/10 flex-1">
-                                            <input type="checkbox" name="parkingAvailable" defaultChecked={formData.parkingAvailable} className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
-                                            <label className="text-white font-medium">Parking Available</label>
-                                        </div>
-                                        <div className="flex items-center gap-3 bg-white/5 px-4 py-3 rounded-xl border border-white/10 flex-1">
-                                            <input type="checkbox" name="valetParking" defaultChecked={formData.valetParking} className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
-                                            <label className="text-white font-medium">Valet Parking</label>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            </div>
 
                             {/* MEDIA */}
-                            {activeTab === "media" && (
-                                <div className="space-y-2">
-                                    <label className="text-sm text-zinc-400 mb-2 block">Photo Gallery</label>
-                                    <MediaUpload onChange={setMedia} initialMedia={media} />
-                                </div>
-                            )}
+                            <div className={activeTab === "media" ? "space-y-2" : "hidden"}>
+                                <label className="text-sm text-zinc-400 mb-2 block">Photo Gallery</label>
+                                <MediaUpload onChange={setMedia} initialMedia={media} />
+                            </div>
 
                         </form>
                     )}

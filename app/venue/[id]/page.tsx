@@ -156,14 +156,14 @@ export default function VenueDetailPage() {
               {visualMedia[0].type === 'video' ? (
                 <video
                   src={visualMedia[0].url}
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-cover"
                   muted
                   loop
                   onMouseEnter={(e) => e.currentTarget.play()}
                   onMouseLeave={(e) => e.currentTarget.pause()}
                 />
               ) : (
-                <img src={visualMedia[0].url} className="w-full h-full object-contain transition duration-700 group-hover:scale-105" alt="Main" />
+                <img src={visualMedia[0].url} className="w-full h-full object-cover transition duration-700 group-hover:scale-105" alt="Main" />
               )}
               {visualMedia[0].type === 'video' && (
                 <div className="absolute top-4 right-4 bg-black/50 p-2 rounded-full pointer-events-none">
@@ -189,14 +189,14 @@ export default function VenueDetailPage() {
                   {visualMedia[i].type === 'video' ? (
                     <video
                       src={visualMedia[i].url}
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-cover"
                       muted
                       loop
                       onMouseEnter={(e) => e.currentTarget.play()}
                       onMouseLeave={(e) => e.currentTarget.pause()}
                     />
                   ) : (
-                    <img src={visualMedia[i].url} className="w-full h-full object-contain transition duration-500 group-hover:scale-105" alt={`Gallery ${i}`} />
+                    <img src={visualMedia[i].url} className="w-full h-full object-cover transition duration-500 group-hover:scale-105" alt={`Gallery ${i}`} />
                   )}
                   {visualMedia[i].type === 'video' && (
                     <div className="absolute top-2 right-2 bg-black/50 p-1.5 rounded-full pointer-events-none">

@@ -83,11 +83,11 @@ export async function updateVenue(formData: FormData) {
                     website: data.website,
                     phone: data.phone,
                     reservationsEnabled: data.reservationsEnabled,
-                    ambiance: data.ambiance,
-                    musicStyle: data.musicStyle,
+                    // ambiance: data.ambiance, // TODO: Add to schema or attributes
+                    // musicStyle: data.musicStyle, // TODO: Add to schema or attributes
                     openingHours: data.openingHours,
                     weeklySchedule: data.weeklySchedule ?? undefined,
-                    eventTypes: data.eventTypes
+                    // eventTypes: data.eventTypes // TODO: Add to schema or attributes
                 }
             });
 

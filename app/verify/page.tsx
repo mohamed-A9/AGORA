@@ -3,7 +3,9 @@
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function VerifyPage() {
+import { Suspense } from "react";
+
+function VerifyPageContent() {
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -34,5 +36,13 @@ export default function VerifyPage() {
         <p className="opacity-70 mt-2">Veuillez patienter.</p>
       </div>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <VerifyPageContent />
+    </Suspense>
   );
 }

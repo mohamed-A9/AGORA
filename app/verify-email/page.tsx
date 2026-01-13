@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function VerifyEmailPage() {
+import { Suspense } from "react";
+
+function VerifyEmailPageContent() {
   const sp = useSearchParams();
   const router = useRouter();
   const token = sp.get("token") || "";
@@ -48,5 +50,13 @@ export default function VerifyEmailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#070A12] text-white flex items-center justify-center">Loading...</div>}>
+      <VerifyEmailPageContent />
+    </Suspense>
   );
 }

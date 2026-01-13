@@ -9,7 +9,7 @@ function json(status: number, body: any) {
 
 export async function POST(req: Request) {
   // ✅ Auth (USER connecté)
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const token = await getToken({ req: req as any, secret: process.env.NEXTAUTH_SECRET });
   if (!token?.uid) return json(401, { error: "UNAUTHORIZED" });
 
   const userId = String(token.uid);

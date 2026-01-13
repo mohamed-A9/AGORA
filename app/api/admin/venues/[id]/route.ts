@@ -6,7 +6,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> } // In Next.js 15+, params is a Promise
 ) {
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const token = await getToken({ req: req as any, secret: process.env.NEXTAUTH_SECRET });
 
   if (!token || token.role !== "ADMIN") {
     return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });

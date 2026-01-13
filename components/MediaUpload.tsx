@@ -150,7 +150,6 @@ export default function MediaUpload({ onChange, initialMedia = [] }: MediaUpload
                 options={{
                     sources: ['local', 'url', 'camera'],
                     resourceType: "auto",
-                    excludeOriginal: true,
                     multiple: true,  // ENABLE MULTIPLE SELECTION
                     maxFiles: 20     // REASONABLE LIMIT
                 }}

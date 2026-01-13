@@ -29,7 +29,7 @@ export async function createVenueDraft(prevState: any, formData: FormData) {
                 description,
                 city: "Pending",
                 address: "",
-                ownerId: session.user.id as string,
+                ownerId: (session.user as any).id as string,
                 status: "DRAFT"
             }
         });
@@ -46,7 +46,7 @@ export async function updateVenueStep(venueId: string, data: any) {
 
     try {
         await prisma.venue.update({
-            where: { id: venueId, ownerId: session.user.id as string },
+            where: { id: venueId, ownerId: (session.user as any).id as string },
             data: data
         });
         return { success: true };
@@ -74,7 +74,7 @@ const VenueSchema = z.object({
     endDate: z.string().optional(),   // Receive as string from form
     eventTypes: z.array(z.string()).optional(),
     venueTypeId: z.number().optional(), // New field
-    attributes: z.record(z.any()).optional(), // Dynamic attributes
+    attributes: z.record(z.string(), z.any()).optional(), // Dynamic attributes
     media: z.array(z.object({
         url: z.string().url(),
         type: z.enum(["image", "video", "pdf"])
@@ -91,7 +91,7 @@ export async function createVenue(prevState: any, formData: FormData) {
     // @ts-ignore - session.user.role is typed as any in auth.ts
     const role = session.user.role;
     // @ts-ignore
-    const userId = session.user.id;
+    const userId = (session.user as any).id;
 
     if (role !== "BUSINESS" && role !== "ADMIN") {
         return { error: "Forbidden: Only Business accounts can create venues" };
@@ -184,13 +184,13 @@ export async function createVenue(prevState: any, formData: FormData) {
                 website: data.website || null,
                 phone: data.phone || null,
                 reservationsEnabled: data.reservationsEnabled ?? true,
-                ambiance: data.ambiance || null,
-                musicStyle: data.musicStyle || null,
+                // ambiance: data.ambiance || null,
+                // musicStyle: data.musicStyle || null,
                 openingHours: data.openingHours || null,
                 startDate: data.startDate ? new Date(data.startDate) : null,
                 endDate: data.endDate ? new Date(data.endDate) : null,
                 weeklySchedule: data.weeklySchedule ?? undefined,
-                eventTypes: data.eventTypes ?? [],
+                // eventTypes: data.eventTypes ?? [],
                 ownerId: userId,
                 status: "PENDING", // Default status
 
@@ -198,7 +198,7 @@ export async function createVenue(prevState: any, formData: FormData) {
                 attributes: {
                     create: Object.entries(data.attributes || {}).map(([key, value]) => ({
                         field_key: key,
-                        value_json: value
+                        value_json: value as any
                     }))
                 },
 

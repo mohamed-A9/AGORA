@@ -38,7 +38,7 @@ export async function createEvent(formData: FormData) {
 
     // Verify ownership
     const venue = await prisma.venue.findUnique({ where: { id: data.venueId } });
-    if (!venue || venue.ownerId !== session.user.id) return { error: "Forbidden" };
+    if (!venue || venue.ownerId !== (session.user as any).id) return { error: "Forbidden" };
 
     try {
         await prisma.event.create({
@@ -69,7 +69,7 @@ export async function deleteEvent(eventId: string) {
         include: { venue: true }
     });
 
-    if (!event || event.venue.ownerId !== session.user.id) return { error: "Forbidden" };
+    if (!event || event.venue.ownerId !== (session.user as any).id) return { error: "Forbidden" };
 
     try {
         await prisma.event.delete({ where: { id: eventId } });

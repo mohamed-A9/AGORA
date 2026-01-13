@@ -8,7 +8,9 @@ type Role = "USER" | "BUSINESS";
 
 import { useSearchParams } from "next/navigation";
 
-export default function SignUpPage() {
+import { Suspense } from "react";
+
+function SignUpPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialRole = searchParams.get("role") === "business" ? "BUSINESS" : "USER";
@@ -123,5 +125,13 @@ export default function SignUpPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#070A12] text-white flex items-center justify-center">Loading...</div>}>
+      <SignUpPageContent />
+    </Suspense>
   );
 }

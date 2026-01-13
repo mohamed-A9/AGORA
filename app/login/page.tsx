@@ -28,7 +28,9 @@ function makeParticles(count: number): Particle[] {
   }));
 }
 
-export default function LoginPage() {
+import { Suspense } from "react";
+
+function LoginPageContent() {
   const router = useRouter();
   const sp = useSearchParams();
   const { status: sessionStatus } = useSession();
@@ -270,6 +272,14 @@ export default function LoginPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#070A12] text-white flex items-center justify-center">Loading...</div>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
 

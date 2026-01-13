@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createVenueDraft } from "@/actions/venue";
-import { categories } from "@/lib/constants"; // Assuming you have categories here or we fetch them
+
 
 export default function BasicsStep({ onNext, setVenueId, initialData }: { onNext: (data: any) => void, setVenueId: (id: string) => void, initialData?: any }) {
     const [isLoading, setIsLoading] = useState(false);

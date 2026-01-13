@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 
   const venues = await prisma.venue.findMany({
     where: { ownerId },
-    orderBy: { createdAt: "desc" },
+    // orderBy: { createdAt: "desc" },
     select: {
       id: true,
       name: true,
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
       address: true,
       description: true,
       status: true,
-      createdAt: true,
+      // createdAt: true,
     },
     take: 200,
   });
@@ -56,8 +56,8 @@ export async function POST(req: Request) {
     data: {
       name,
       city,
-      category,
-      address,
+      category: category || "",
+      address: address || "",
       description,
       ownerId,
       status: "PENDING",

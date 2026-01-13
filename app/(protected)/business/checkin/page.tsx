@@ -79,8 +79,8 @@ export default function BusinessCheckinPage() {
       active = false;
       clearTimeout(t);
       try {
-        readerRef.current?.reset();
-      } catch {}
+        (readerRef.current as any)?.reset();
+      } catch { }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

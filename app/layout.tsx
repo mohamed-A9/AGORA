@@ -1,6 +1,6 @@
 import "./globals.css";
 import Providers from "./providers";
-import CoolBackground from "@/components/CoolBackground";
+import AuroraBackground from "@/components/AuroraBackground";
 import Header from "@/components/Header";
 
 export const metadata = {
@@ -14,14 +14,34 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                if (typeof window !== 'undefined' && !window.ethereum) {
+                   window.ethereum = { 
+                     isMetaMask: false, 
+                     request: function() { return new Promise(function(resolve) { resolve([]); }); },
+                     on: function() {},
+                     removeListener: function() {},
+                     selectedAddress: null
+                   };
+                }
+              } catch (e) { console.warn('Ethereum shim failed', e); }
+            `,
+          }}
+        />
+      </head>
       <body>
         <Providers>
-          <CoolBackground />
-          <Header />
-          <div className="relative min-h-screen pt-28">
-            {children}
-          </div>
+          <AuroraBackground>
+            <Header />
+            <div className="pt-24 px-4 pb-12 opacity-0 animate-slide-up" style={{ animationFillMode: "forwards" }}>
+              {children}
+            </div>
+          </AuroraBackground>
         </Providers>
       </body>
     </html>

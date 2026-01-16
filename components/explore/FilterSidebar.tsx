@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { moroccanCities, VENUE_CATEGORIES, DRESS_CODES, AGE_POLICIES, PAYMENT_METHODS } from "@/lib/constants";
+import { moroccanCities, VENUE_CATEGORIES, DRESS_CODES, AGE_POLICIES, PAYMENT_METHODS, AMBIANCES, CUISINES } from "@/lib/constants";
+import { EVENT_TYPES, getGenresForType } from "@/lib/event-taxonomy";
 import { X, Filter, ChevronDown, ChevronUp } from "lucide-react";
 
 interface FilterSidebarProps {
@@ -32,13 +33,13 @@ export default function FilterSidebar({ filters, setFilters, className = "", onC
     };
 
     return (
-        <div className={`bg-zinc-900 border-r border-white/10 h-full overflow-y-auto w-80 flex-shrink-0 flex flex-col ${className}`}>
-            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20 backdrop-blur-sm sticky top-0 z-10">
+        <div className={`flex flex-col ${className}`}>
+            <div className="p-4 border-b border-white/10 flex justify-between items-center lg:hidden">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
                     <Filter size={20} /> Filters
                 </h2>
                 {onClose && (
-                    <button onClick={onClose} className="md:hidden text-white/70 hover:text-white">
+                    <button onClick={onClose} className="text-white/70 hover:text-white">
                         <X size={24} />
                     </button>
                 )}
@@ -80,8 +81,8 @@ export default function FilterSidebar({ filters, setFilters, className = "", onC
                                     key={cat}
                                     onClick={() => updateFilter("category", filters.category === cat ? "" : cat)}
                                     className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${filters.category === cat
-                                            ? "bg-white text-black border-white"
-                                            : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                                        ? "bg-white text-black border-white"
+                                        : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
                                         }`}
                                 >
                                     {cat}
@@ -160,6 +161,134 @@ export default function FilterSidebar({ filters, setFilters, className = "", onC
 
                 <div className="h-px bg-white/5" />
 
+                {/* Date & Time Selection */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("date")}>
+                        <h3 className="font-semibold text-white">Date & Time</h3>
+                        {expandedSection === "date" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
+                    </div>
+                    {expandedSection === "date" && (
+                        <div className="space-y-3">
+                            <input
+                                type="date"
+                                value={filters.date || ""}
+                                onChange={(e) => updateFilter("date", e.target.value)}
+                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
+                            />
+                            <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-zinc-500 px-1">Starting After</label>
+                                <input
+                                    type="time"
+                                    value={filters.startTime || ""}
+                                    onChange={(e) => updateFilter("startTime", e.target.value)}
+                                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="h-px bg-white/5" />
+
+                {/* Event Filters */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("events")}>
+                        <h3 className="font-semibold text-white">Upcoming Events</h3>
+                        {expandedSection === "events" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
+                    </div>
+                    {expandedSection === "events" && (
+                        <div className="space-y-4">
+                            <select
+                                value={filters.eventType || ""}
+                                onChange={(e) => {
+                                    updateFilter("eventType", e.target.value);
+                                    updateFilter("eventGenre", ""); // Reset genre on type change
+                                }}
+                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
+                            >
+                                <option value="">Any Event Type</option>
+                                {EVENT_TYPES.map(t => (
+                                    <option key={t.id} value={t.id}>{t.label}</option>
+                                ))}
+                            </select>
+
+                            {filters.eventType && (
+                                <div className="space-y-2">
+                                    <p className="text-xs text-white/50 font-medium px-1 uppercase tracking-wider">Genres</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {getGenresForType(filters.eventType).map(genre => (
+                                            <button
+                                                key={genre}
+                                                onClick={() => updateFilter("eventGenre", filters.eventGenre === genre ? "" : genre)}
+                                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-tight border transition-colors ${filters.eventGenre === genre
+                                                    ? "bg-indigo-600 border-indigo-500 text-white"
+                                                    : "bg-white/5 text-white/60 border-white/5 hover:border-white/10"
+                                                    }`}
+                                            >
+                                                {genre}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="h-px bg-white/5" />
+
+                {/* Ambiance */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("ambiance")}>
+                        <h3 className="font-semibold text-white">Ambiance</h3>
+                        {expandedSection === "ambiance" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
+                    </div>
+                    {expandedSection === "ambiance" && (
+                        <div className="flex flex-wrap gap-2">
+                            {AMBIANCES.map(a => (
+                                <button
+                                    key={a}
+                                    onClick={() => updateFilter("ambiance", filters.ambiance === a ? "" : a)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${filters.ambiance === a
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-zinc-600"
+                                        }`}
+                                >
+                                    {a}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="h-px bg-white/5" />
+
+                {/* Cuisine */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("cuisine")}>
+                        <h3 className="font-semibold text-white">Cuisine / Food</h3>
+                        {expandedSection === "cuisine" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
+                    </div>
+                    {expandedSection === "cuisine" && (
+                        <div className="flex flex-wrap gap-2">
+                            {CUISINES.map(c => (
+                                <button
+                                    key={c}
+                                    onClick={() => updateFilter("cuisine", filters.cuisine === c ? "" : c)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${filters.cuisine === c
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-zinc-600"
+                                        }`}
+                                >
+                                    {c}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="h-px bg-white/5" />
+
                 {/* Payment Methods */}
                 <div className="space-y-3">
                     <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("payment")}>
@@ -173,8 +302,8 @@ export default function FilterSidebar({ filters, setFilters, className = "", onC
                                     key={method}
                                     onClick={() => toggleArrayFilter("paymentMethods", method)}
                                     className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${filters.paymentMethods?.includes(method)
-                                            ? "bg-indigo-600/20 border-indigo-500/50 text-indigo-200"
-                                            : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600"
+                                        ? "bg-indigo-600/20 border-indigo-500/50 text-indigo-200"
+                                        : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600"
                                         }`}
                                 >
                                     {method}
@@ -183,13 +312,14 @@ export default function FilterSidebar({ filters, setFilters, className = "", onC
                         </div>
                     )}
                 </div>
+
             </div>
 
             {/* Footer Actions */}
-            <div className="p-4 border-t border-white/10 bg-zinc-900 sticky bottom-0">
+            <div className="p-4 mt-auto">
                 <button
                     onClick={() => setFilters({})}
-                    className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium transition-colors text-sm"
+                    className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium transition-colors text-sm border border-white/10"
                 >
                     Reset Filters
                 </button>

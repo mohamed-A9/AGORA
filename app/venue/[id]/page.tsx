@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, MapPin, Globe, Phone, Share, Heart, X, ChevronLeft, ChevronRight, Play, FileText } from "lucide-react";
+import { ArrowLeft, MapPin, Globe, Phone, Share, Heart, X, ChevronLeft, ChevronRight, Play, FileText, Edit, Trash2 } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { deleteVenue } from "@/actions/venue";
 
 export default function VenueDetailPage() {
   const params = useParams<{ id: string }>();
@@ -60,6 +61,16 @@ export default function VenueDetailPage() {
     setDateTime("");
   }
 
+  async function handleDelete() {
+    if (!confirm("Are you sure you want to delete this venue? This cannot be undone.")) return;
+    const res = await deleteVenue(venue.id);
+    if (res?.success) {
+      router.push("/business/dashboard");
+    } else {
+      alert(res?.error || "Delete failed");
+    }
+  }
+
   if (loading) return <div className="min-h-screen flex items-center justify-center text-white/50">Loading magic...</div>;
   if (!venue) return <div className="min-h-screen flex items-center justify-center text-white/50">Venue not found.</div>;
 
@@ -77,6 +88,19 @@ export default function VenueDetailPage() {
     e.stopPropagation();
     setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : visualMedia.length - 1));
   };
+
+  // Permission Check
+  // @ts-ignore
+  const role = session?.user?.role;
+  // @ts-ignore
+  const userId = session?.user?.id; // Note: id might be directly on user or sub
+  // Standard NextAuth structure depends on callback. Assuming id is available as verified in actions.
+  // We'll check carefully. Use uid from token in logic, here relying on session shape.
+  // Actually, usually session.user.id if configured.
+
+  const isOwner = userId === venue.ownerId;
+  const isAdmin = role === "ADMIN";
+  const canEdit = isOwner || isAdmin;
 
   return (
     <div className="max-w-7xl mx-auto pb-20 pt-4 px-4 sm:px-6">
@@ -127,6 +151,25 @@ export default function VenueDetailPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight">{venue.name}</h1>
           <div className="flex gap-2">
+            {canEdit && (
+              <>
+                <button
+                  onClick={() => router.push(`/business/edit-venue/${venue.id}`)}
+                  className="p-2 rounded-full bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 transition-colors"
+                  title="Edit Venue"
+                >
+                  <Edit className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="p-2 rounded-full bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
+                  title="Delete Venue"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+                <div className="w-px h-8 bg-white/10 mx-1"></div>
+              </>
+            )}
             <button className="p-2 rounded-full hover:bg-white/10 transition-colors text-white">
               <Share className="w-5 h-5" />
             </button>

@@ -16,6 +16,10 @@ export async function POST(req: Request) {
     const roleRaw = String(body?.role || "USER").trim().toUpperCase();
     const role = roleRaw === "BUSINESS" ? "BUSINESS" : "USER";
 
+    const birthdayStr = String(body?.birthday || "").trim();
+    const birthday = birthdayStr ? new Date(birthdayStr) : null;
+    const gender = String(body?.gender || "").trim() || null;
+
     if (!email || !password) {
       return NextResponse.json({ error: "EMAIL_PASSWORD_REQUIRED" }, { status: 400 });
     }
@@ -38,6 +42,8 @@ export async function POST(req: Request) {
         name,
         phone,
         role,
+        birthday,
+        gender,
         emailVerified: null,
         emailVerificationToken,
         emailVerificationExpiresAt,

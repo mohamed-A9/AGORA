@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
@@ -10,7 +12,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       where: { id },
       include: {
         media: true,
-        events: true, // Include events
+        events: {
+          include: { media: true }
+        },
         owner: { select: { id: true, name: true } },
       },
     });

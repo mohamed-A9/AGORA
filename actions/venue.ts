@@ -45,8 +45,21 @@ export async function updateVenueStep(venueId: string, data: any) {
     if (!session || !session.user) return { error: "Unauthorized" };
 
     try {
+        const userId = (session.user as any).id as string;
+
+        // Fetch fresh user to ensure Admin role is respected even if session is stale
+        const dbUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { role: true }
+        });
+        const role = dbUser?.role || "USER";
+
+        const whereClause = role === "ADMIN"
+            ? { id: venueId }
+            : { id: venueId, ownerId: userId };
+
         await prisma.venue.update({
-            where: { id: venueId, ownerId: (session.user as any).id as string },
+            where: whereClause,
             data: data
         });
         return { success: true };
@@ -67,6 +80,7 @@ const VenueSchema = z.object({
     phone: z.string().optional(),
     reservationsEnabled: z.boolean().optional(),
     ambiance: z.string().optional(),
+    cuisine: z.string().optional(),
     musicStyle: z.string().optional(),
     openingHours: z.string().optional(),
     weeklySchedule: z.any().optional(),
@@ -149,6 +163,7 @@ export async function createVenue(prevState: any, formData: FormData) {
         phone: formData.get("phone"),
         reservationsEnabled: formData.get("reservationsEnabled") === "on",
         ambiance: formData.get("ambiance"),
+        cuisine: formData.get("cuisine"),
         musicStyle: formData.get("musicStyle"),
         openingHours: openingHours,
         startDate: formData.get("startDate"),
@@ -184,8 +199,9 @@ export async function createVenue(prevState: any, formData: FormData) {
                 website: data.website || null,
                 phone: data.phone || null,
                 reservationsEnabled: data.reservationsEnabled ?? true,
-                // ambiance: data.ambiance || null,
-                // musicStyle: data.musicStyle || null,
+                ambiance: data.ambiance || null,
+                cuisine: data.cuisine || null,
+                musicStyle: data.musicStyle || null,
                 openingHours: data.openingHours || null,
                 startDate: data.startDate ? new Date(data.startDate) : null,
                 endDate: data.endDate ? new Date(data.endDate) : null,
@@ -218,4 +234,35 @@ export async function createVenue(prevState: any, formData: FormData) {
     }
 
     redirect("/business/dashboard");
+}
+
+export async function deleteVenue(venueId: string) {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) return { error: "Unauthorized" };
+
+    const userId = (session.user as any).id as string;
+
+    try {
+        // Fetch fresh user for role check
+        const dbUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { role: true }
+        });
+        const role = dbUser?.role || "USER";
+
+        const whereClause = role === "ADMIN"
+            ? { id: venueId }
+            : { id: venueId, ownerId: userId };
+
+        await prisma.venue.delete({
+            where: whereClause
+        });
+
+        revalidatePath("/business/dashboard");
+        return { success: true };
+    } catch (e: any) {
+        console.error("Delete Venue Error:", e);
+        // Clean error message
+        return { error: `Delete failed: ${e.message}` };
+    }
 }

@@ -13,7 +13,12 @@ const EventSchema = z.object({
     date: z.string(), // ISO String or YYYY-MM-DD
     startTime: z.string().optional(),
     endTime: z.string().optional(),
-    mediaUrl: z.string().optional()
+    type: z.string().optional(),
+    genre: z.string().optional(),
+    media: z.array(z.object({
+        url: z.string().url(),
+        type: z.enum(["image", "video", "pdf"])
+    })).optional()
 });
 
 export async function createEvent(formData: FormData) {
@@ -27,7 +32,9 @@ export async function createEvent(formData: FormData) {
         date: formData.get("date"),
         startTime: formData.get("startTime"),
         endTime: formData.get("endTime"),
-        mediaUrl: formData.get("mediaUrl")
+        type: formData.get("type"),
+        genre: formData.get("genre"),
+        media: JSON.parse(formData.get("mediaJson") as string || "[]")
     };
 
     const validated = EventSchema.safeParse(rawData);
@@ -36,22 +43,45 @@ export async function createEvent(formData: FormData) {
     }
     const data = validated.data;
 
-    // Verify ownership
+    // Verify ownership or Admin
     const venue = await prisma.venue.findUnique({ where: { id: data.venueId } });
-    if (!venue || venue.ownerId !== (session.user as any).id) return { error: "Forbidden" };
+
+    // Fetch fresh role
+    const dbUser = await prisma.user.findUnique({
+        where: { id: (session.user as any).id },
+        select: { role: true }
+    });
+    const role = dbUser?.role || "USER";
+
+    if (!venue || (venue.ownerId !== (session.user as any).id && role !== "ADMIN")) return { error: "Forbidden" };
 
     try {
-        await prisma.event.create({
-            data: {
-                venueId: data.venueId,
-                name: data.name,
-                description: data.description,
-                date: new Date(data.date),
-                startTime: data.startTime,
-                endTime: data.endTime,
-                mediaUrl: data.mediaUrl
+        await prisma.$transaction(async (tx: any) => {
+            const event = await tx.event.create({
+                data: {
+                    venueId: data.venueId,
+                    name: data.name,
+                    description: data.description,
+                    date: new Date(data.date),
+                    startTime: data.startTime,
+                    endTime: data.endTime,
+                    type: data.type,
+                    genre: data.genre,
+                    // mediaUrl: legacy, ignored
+                }
+            });
+
+            if (data.media && data.media.length > 0) {
+                await tx.media.createMany({
+                    data: data.media.map(m => ({
+                        eventId: event.id,
+                        url: m.url,
+                        type: m.type
+                    }))
+                });
             }
         });
+
         revalidatePath(`/business/edit-venue/${data.venueId}`);
         return { success: true };
     } catch (e) {
@@ -69,7 +99,14 @@ export async function deleteEvent(eventId: string) {
         include: { venue: true }
     });
 
-    if (!event || event.venue.ownerId !== (session.user as any).id) return { error: "Forbidden" };
+    // Fetch fresh role
+    const dbUser = await prisma.user.findUnique({
+        where: { id: (session.user as any).id },
+        select: { role: true }
+    });
+    const role = dbUser?.role || "USER";
+
+    if (!event || (event.venue.ownerId !== (session.user as any).id && role !== "ADMIN")) return { error: "Forbidden" };
 
     try {
         await prisma.event.delete({ where: { id: eventId } });

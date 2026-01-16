@@ -4,7 +4,7 @@ import { useState } from "react";
 import { updateVenueStep } from "@/actions/venue";
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { DRESS_CODES, AGE_POLICIES, PAYMENT_METHODS } from "@/lib/constants";
+import { DRESS_CODES, AGE_POLICIES, PAYMENT_METHODS, AMBIANCES, CUISINES } from "@/lib/constants";
 
 export default function DetailsStep({ venueId, onNext, onBack, initialData }: { venueId: string, onNext: (data: any) => void, onBack: () => void, initialData?: any }) {
     const [isLoading, setIsLoading] = useState(false);
@@ -13,6 +13,10 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
     const [phone, setPhone] = useState(initialData?.phone || "");
     const [website, setWebsite] = useState(initialData?.website || "");
     const [instagram, setInstagram] = useState(initialData?.instagram || "");
+
+    // Identity Details
+    const [ambiance, setAmbiance] = useState(initialData?.ambiance || "");
+    const [cuisine, setCuisine] = useState(initialData?.cuisine || "");
 
     // Policies - Initialize from initialData
     const [dressCode, setDressCode] = useState(initialData?.dressCode || "");
@@ -48,14 +52,17 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
             paymentMethods,
             parkingAvailable,
             valetParking,
-            reservationsEnabled
+            reservationsEnabled,
+            ambiance,
+            cuisine
         });
 
         if (res?.success) {
             onNext({
                 phone, website, instagram,
                 dressCode, agePolicy, paymentMethods,
-                parkingAvailable, valetParking, reservationsEnabled
+                parkingAvailable, valetParking, reservationsEnabled,
+                ambiance, cuisine
             });
         } else {
             console.error("Details Step Error:", res?.error);
@@ -69,6 +76,27 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
             <div>
                 <h2 className="text-2xl font-bold text-white mb-2">Step 3: Details & Policies</h2>
                 <p className="text-zinc-400">Tell us more about the experience.</p>
+            </div>
+
+            {/* Experience & Style */}
+            <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white border-b border-white/10 pb-2">Experience & Style</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="text-sm text-zinc-400">Ambiance (Optional)</label>
+                        <select value={ambiance} onChange={e => setAmbiance(e.target.value)} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
+                            <option value="">Select Ambiance...</option>
+                            {AMBIANCES.map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm text-zinc-400">Cuisine / Secondary Style (Optional)</label>
+                        <select value={cuisine} onChange={e => setCuisine(e.target.value)} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
+                            <option value="">Select Style...</option>
+                            {CUISINES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+                </div>
             </div>
 
             {/* Contact Information */}

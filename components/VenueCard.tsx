@@ -10,10 +10,11 @@ interface VenueCardProps {
     category: string;
     rating?: number;
     imageUrl?: string;
-    price?: string; // Optional if we add pricing later
+    ambiance?: string;
+    cuisine?: string;
 }
 
-export default function VenueCard({ id, name, city, category, rating, imageUrl }: VenueCardProps) {
+export default function VenueCard({ id, name, city, category, rating, imageUrl, ambiance, cuisine }: VenueCardProps) {
     return (
         <Link href={`/venue/${id}`} className="group block h-full">
             <div className="relative h-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/10 hover:shadow-2xl hover:border-white/20">
@@ -50,7 +51,12 @@ export default function VenueCard({ id, name, city, category, rating, imageUrl }
                         <h3 className="text-lg font-bold text-white group-hover:text-indigo-300 transition-colors line-clamp-1">{name}</h3>
                     </div>
 
-                    <p className="mt-1 text-sm text-white/60">{city}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/60">
+                        <span>{city}</span>
+                        {(ambiance || cuisine) && <span>•</span>}
+                        {ambiance && <span className="text-indigo-400 font-medium">{ambiance}</span>}
+                        {cuisine && <span className="text-purple-400 font-medium">{cuisine}</span>}
+                    </div>
 
                     <div className="mt-4 flex items-center gap-2 text-sm text-white/50 group-hover:text-white/70">
                         <span className="font-semibold text-white">Réserver</span>

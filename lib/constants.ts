@@ -10,3 +10,13 @@ export const VENUE_CATEGORIES = ["Restaurant", "Club", "Cafe", "Rooftop", "Loung
 export const DRESS_CODES = ["Casual", "Smart Casual", "Formal", "Beachwear", "Sporty", "No Dress Code"];
 export const AGE_POLICIES = ["All Ages", "18+", "21+", "23+", "25+", "Family Friendly"];
 export const PAYMENT_METHODS = ["Cash", "Credit Card", "Apple Pay", "Crypto"];
+
+export const AMBIANCES = [
+    "Chic & Elegant", "Underground", "Cozy", "Party", "Romantic",
+    "Family Friendly", "Business", "Traditional", "Modern", "Rooftop"
+];
+
+export const CUISINES = [
+    "Moroccan", "Italian", "French", "Japanese", "Lebanese",
+    "Mediterranean", "Asian Fusion", "Steakhouse", "Seafood", "International"
+];

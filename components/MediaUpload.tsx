@@ -2,10 +2,11 @@
 
 import { CldUploadWidget } from "next-cloudinary";
 import { Upload, ChevronLeft, ChevronRight, Trash2, FileText, Pencil } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import ImageCropper from "./ImageCropper";
 
 interface MediaItem {
+    id?: string;
     url: string;
     type: "image" | "video" | "pdf";
 }
@@ -29,21 +30,8 @@ export default function MediaUpload({
     title = "Upload Media",
     description = "Images, Videos, or PDF Menus"
 }: MediaUploadProps) {
-    const [items, setItems] = useState<MediaItem[]>(initialMedia);
+    const items = initialMedia; // Controlled component pattern
     const [croppingItemIndex, setCroppingItemIndex] = useState<number | null>(null);
-
-    // Sync from parent on mount
-    useEffect(() => {
-        if (initialMedia && initialMedia.length > 0 && items.length === 0) {
-            setItems(initialMedia);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [initialMedia]);
-
-    // Sync to parent
-    useEffect(() => {
-        onChange(items);
-    }, [items, onChange]);
 
     const handleUpload = (result: any) => {
         const info = result?.info;
@@ -57,49 +45,41 @@ export default function MediaUpload({
                 type
             };
 
-            setItems(prev => [...prev, newItem]);
+            onChange([...items, newItem]);
         }
     };
 
     const handleDelete = (index: number) => {
-        setItems(prev => {
-            const newItems = [...prev];
-            newItems.splice(index, 1);
-            return newItems;
-        });
+        const newItems = [...items];
+        newItems.splice(index, 1);
+        onChange(newItems);
     };
 
     const makeMain = (index: number) => {
         if (index === 0) return;
-        setItems(prev => {
-            const newItems = [...prev];
-            const item = newItems[index];
-            newItems.splice(index, 1);
-            newItems.unshift(item); // Move to start
-            return newItems;
-        });
+        const newItems = [...items];
+        const item = newItems[index];
+        newItems.splice(index, 1);
+        newItems.unshift(item); // Move to start
+        onChange(newItems);
     };
 
     const moveLeft = (index: number) => {
         if (index === 0) return;
-        setItems(prev => {
-            const newItems = [...prev];
-            const temp = newItems[index];
-            newItems[index] = newItems[index - 1];
-            newItems[index - 1] = temp;
-            return newItems;
-        });
+        const newItems = [...items];
+        const temp = newItems[index];
+        newItems[index] = newItems[index - 1];
+        newItems[index - 1] = temp;
+        onChange(newItems);
     };
 
     const moveRight = (index: number) => {
-        setItems(prev => {
-            if (index === prev.length - 1) return prev;
-            const newItems = [...prev];
-            const temp = newItems[index];
-            newItems[index] = newItems[index + 1];
-            newItems[index + 1] = temp;
-            return newItems;
-        });
+        if (index === items.length - 1) return;
+        const newItems = [...items];
+        const temp = newItems[index];
+        newItems[index] = newItems[index + 1];
+        newItems[index + 1] = temp;
+        onChange(newItems);
     };
 
     // --- Cropping Logic ---
@@ -108,14 +88,10 @@ export default function MediaUpload({
     const getCleanUrl = (url: string) => {
         // Remove Cloudinary transformations /upload/c_crop.../v
         // Regex to match /upload/ followed by any transformations until /v
-        // This is a naive check, assumes standard Cloudinary URL structure
         if (url.includes("/upload/") && url.includes("/v")) {
-            // Split by /upload/
             const parts = url.split("/upload/");
             if (parts.length === 2) {
                 const rest = parts[1];
-                // If it starts with v123... it's clean. If it starts with some chars then /v123... it has transforms.
-                // We want to remove everything before /v
                 const vIndex = rest.indexOf("/v");
                 if (vIndex > 0) {
                     return parts[0] + "/upload/" + rest.substring(vIndex);
@@ -129,22 +105,16 @@ export default function MediaUpload({
     const handleCropSave = (cropPixels: any) => {
         if (croppingItemIndex === null || !cropPixels) return;
 
-        setItems(prev => {
-            const newItems = [...prev];
-            const item = newItems[croppingItemIndex];
-            const cleanUrl = getCleanUrl(item.url);
+        const newItems = [...items];
+        const item = newItems[croppingItemIndex];
+        const cleanUrl = getCleanUrl(item.url);
 
-            // Construct Cloudinary Transformation
-            // c_crop,x_100,y_100,w_400,h_400
-            const transform = `c_crop,x_${cropPixels.x},y_${cropPixels.y},w_${cropPixels.width},h_${cropPixels.height}`;
+        // Construct Cloudinary Transformation
+        const transform = `c_crop,x_${cropPixels.x},y_${cropPixels.y},w_${cropPixels.width},h_${cropPixels.height}`;
+        const newUrl = cleanUrl.replace("/upload/", `/upload/${transform}/`);
 
-            // Insert transformation into URL
-            // .../upload/v12345/... -> .../upload/c_crop,x_...,y_...,w_...,h_.../v12345/...
-            const newUrl = cleanUrl.replace("/upload/", `/upload/${transform}/`);
-
-            newItems[croppingItemIndex] = { ...item, url: newUrl };
-            return newItems;
-        });
+        newItems[croppingItemIndex] = { ...item, url: newUrl };
+        onChange(newItems);
 
         setCroppingItemIndex(null);
     };

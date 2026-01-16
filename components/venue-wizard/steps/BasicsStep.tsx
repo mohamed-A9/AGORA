@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createVenueDraft } from "@/actions/venue";
+import { createVenueDraft, updateVenueStep } from "@/actions/venue";
 
 
 export default function BasicsStep({ onNext, setVenueId, initialData }: { onNext: (data: any) => void, setVenueId: (id: string) => void, initialData?: any }) {
@@ -24,19 +24,45 @@ export default function BasicsStep({ onNext, setVenueId, initialData }: { onNext
         setIsLoading(true);
         setError("");
 
-        const res = await createVenueDraft(null, formData);
-
-        if (res?.error) {
-            setError(res.error);
-            setIsLoading(false);
-        } else if (res?.success && res.venueId) {
-            setVenueId(res.venueId);
-            onNext({
+        if (initialData?.id) {
+            // Edit Mode
+            const res = await updateVenueStep(initialData.id, {
                 name: formData.get("name"),
                 category: formData.get("category"),
                 tagline: formData.get("tagline"),
                 description: formData.get("description")
             });
+
+            if (res?.success) {
+                // If ID is already set, we don't strictly need to set it again, but good practice
+                // setVenueId(initialData.id); 
+                onNext({
+                    name: formData.get("name"),
+                    category: formData.get("category"),
+                    tagline: formData.get("tagline"),
+                    description: formData.get("description")
+                });
+            } else {
+                setError(res?.error || "Failed to update venue.");
+                setIsLoading(false);
+            }
+
+        } else {
+            // Create Mode
+            const res = await createVenueDraft(null, formData);
+
+            if (res?.error) {
+                setError(res.error);
+                setIsLoading(false);
+            } else if (res?.success && res.venueId) {
+                setVenueId(res.venueId);
+                onNext({
+                    name: formData.get("name"),
+                    category: formData.get("category"),
+                    tagline: formData.get("tagline"),
+                    description: formData.get("description")
+                });
+            }
         }
     }
 

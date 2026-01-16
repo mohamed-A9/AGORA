@@ -878,58 +878,451 @@ async function main() {
         }
     });
 
-    // Seed Sample Venues
+    // Seed Sample Venues with Images
     const sampleVenues = [
+        // --- RESTAURANTS (FINE DINING & CASUAL) ---
         {
             name: "Le Cabestan",
-            description: "Luxury oceanfront dining experience.",
+            description: "An iconic oceanfront dining experience offering breathtaking views of the Atlantic. Specializing in fresh seafood and Mediterranean classics with a modern twist.",
             city: "Casablanca",
             category: "Restaurant",
-            address: "90 Boulevard de la Corniche",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'fine_dining' } }))?.id,
+            address: "90 Boulevard de la Corniche, Phare d'El Hank",
+            phone: "+212 522 391 190",
+            whatsapp: "+212 600 000 001",
+            website: "https://le-cabestan.ma",
+            instagram: "@lecabestan",
             parkingAvailable: true,
             valetParking: true,
             reservationsEnabled: true,
             dressCode: "Formal",
-            paymentMethods: ["Cash", "Credit Card"],
+            priceRange: "luxury",
+            paymentMethods: ["Cash", "Credit Card", "Amex"],
             status: "APPROVED",
-            ownerId: user.id
-        },
-        {
-            name: "Sky 28",
-            description: "Rooftop bar with panoramic views.",
-            city: "Casablanca",
-            category: "Bar",
-            address: "Twin Center, Boulevard Zerktouni",
-            parkingAvailable: true,
-            valetParking: false,
-            reservationsEnabled: true,
-            dressCode: "Smart Casual",
-            paymentMethods: ["Cash", "Credit Card"],
-            status: "APPROVED",
-            ownerId: user.id
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1544148103-0773bf10d330?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=1000&auto=format&fit=crop"
+            ]
         },
         {
             name: "Rick's Café",
-            description: "A romantic restaurant bar designed to recreate the bar made famous by Humphrey Bogart and Ingrid Bergman in the movie classic Casablanca.",
+            description: "Step into the movie classic 'Casablanca'. A romantic restaurant bar filled with architectural details, brass lighting, and a live pianist playing 'As Time Goes By'.",
             city: "Casablanca",
             category: "Restaurant",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'restaurant' } }))?.id,
             address: "248 Boulevard Sour Jdid",
+            phone: "+212 522 274 207",
+            whatsapp: "+212 661 111 222",
+            website: "https://rickscafe.ma",
+            instagram: "@rickscafecasablanca",
             parkingAvailable: false,
             valetParking: true,
             reservationsEnabled: true,
             dressCode: "Smart Casual",
+            priceRange: "expensive",
             paymentMethods: ["Cash", "Credit Card"],
             status: "APPROVED",
-            ownerId: user.id
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1550966871-3ed3c47e2ce2?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1572116469696-31de0f17cc34?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "Iloli",
+            description: "Casablanca's premier upscale Japanese restaurant. Combining traditional techniques with modern flair. Famous for its Black Cod and Wagyu beef.",
+            city: "Casablanca",
+            category: "Restaurant",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'sushi' } }))?.id,
+            address: "33 Rue Najib Mahfoud, Gauthier",
+            phone: "+212 522 476 617",
+            whatsapp: "+212 662 333 444",
+            website: "https://iloli-casablanca.com",
+            instagram: "@iloli.casablanca",
+            parkingAvailable: true,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Smart Casual",
+            priceRange: "luxury",
+            paymentMethods: ["Cash", "Credit Card", "Amex"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1579027989536-b7b1f875659b?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1617196019294-dcce4779bcb7?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1553621042-f6e147245754?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "La Bodega",
+            description: "A vibrant Spanish tapas bar and restaurant. Known for its lively salsa nights, paella, and sangria. A true fiesta in the heart of the city.",
+            city: "Casablanca",
+            category: "Restaurant",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'restaurant' } }))?.id,
+            address: "129 Boulevard Ben Abdellah",
+            phone: "+212 522 541 842",
+            instagram: "@labodegacasa",
+            parkingAvailable: false,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Casual",
+            priceRange: "moderate",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1515443961218-a51367888e4b?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1536392706979-7f5624da85ca?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1543362906-acfc16c67564?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "Dar Dada",
+            description: "Experience the magic of authentic Moroccan cuisine in a beautifully restored Riad setting. Couscous, Tagines, and Pastilla prepared with love.",
+            city: "Casablanca",
+            category: "Restaurant",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'restaurant' } }))?.id,
+            address: "37 Rue El Araar",
+            phone: "+212 522 222 333",
+            instagram: "@dardadacasablanca",
+            parkingAvailable: false,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Smart Casual",
+            priceRange: "moderate",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1539755530862-00f623c00f52?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1590408542034-7117e34cd369?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "NKOA",
+            description: "A fusion culinary journey blending African, Asian, and South American flavors. Trendy atmosphere and creative cocktails.",
+            city: "Casablanca",
+            category: "Restaurant",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'fine_dining' } }))?.id,
+            address: "19 Rue Abou Kacem Echabbi",
+            phone: "+212 522 999 111",
+            instagram: "@nkoacasablanca",
+            parkingAvailable: true,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Smart Casual",
+            priceRange: "expensive",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1550966871-3ed3c47e2ce2?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1592861956120-e524fc739696?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "Le Petit Rocher",
+            description: "Restaurant and lounge bar literally on the rocks by the sea. Stunning sunset views, lighthouse backdrop, and international cuisine.",
+            city: "Casablanca",
+            category: "Restaurant",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'restaurant' } }))?.id,
+            address: "Complexe au Petit Rocher, Corniche",
+            phone: "+212 522 362 626",
+            website: "https://lepetitrocher.ma",
+            parkingAvailable: true,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Smart Casual",
+            priceRange: "expensive",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1615719413546-198b25453f85?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1525610553991-2bede1a236e2?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1578474843222-9593bc88d8b0?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+
+        // --- NIGHTLIFE (CLUBS, BARS, PUBS) ---
+        {
+            name: "Maison B",
+            description: "Chic club and restaurant. The place to see and be seen in Casablanca. Hosting international DJs and themed parties.",
+            city: "Casablanca",
+            category: "Clubs",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'nightclub' } }))?.id,
+            address: "5 Rue de la Mer d'Adria",
+            phone: "+212 698 999 444",
+            instagram: "@maisonbcasablanca",
+            parkingAvailable: true,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Formal",
+            priceRange: "expensive",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1566737236500-c8ac43014a67?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1570872626485-d8ffea69f463?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "Sky 28",
+            description: "The highest rooftop bar in the city. Sip on signature cocktails while watching the sunset over the skyline. Vibrant atmosphere with localized DJ sets.",
+            city: "Casablanca",
+            category: "Bar",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'rooftop' } }))?.id,
+            address: "Twin Center, Boulevard Zerktouni",
+            phone: "+212 522 958 980",
+            instagram: "@sky28casablanca",
+            parkingAvailable: true,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Smart Casual",
+            priceRange: "expensive",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1571624436279-b272aff75a7e?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "The Vault",
+            description: "An exclusive underground techno club for electronic music enthusiasts. World-class sound system and immersive light shows.",
+            city: "Casablanca",
+            category: "Clubs",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'techno_club' } }))?.id,
+            address: "45 Rue de la Liberté, Sous-sol",
+            phone: "+212 522 111 222",
+            instagram: "@thevault_club",
+            parkingAvailable: true,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Casual / Party",
+            priceRange: "moderate",
+            paymentMethods: ["Cash"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1574391884720-385e6e288793?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1566737236500-c8ac43014a67?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "Le Kimmy'z",
+            description: "French bistro by day, lively party bar by night. Great food, great music, and a fantastic crowd. The perfect spot for dinner and dancing.",
+            city: "Casablanca",
+            category: "Bar",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'pub' } }))?.id,
+            address: "Rue Najib Mahfoud",
+            phone: "+212 522 270 200",
+            instagram: "@lekimmyz",
+            parkingAvailable: true,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Smart Casual",
+            priceRange: "moderate",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1572116469696-31de0f17cc34?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1582106245687-cbb4e330d632?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "O'Malleys Irish Pub",
+            description: "The most authentic Irish pub in town. Live sports, Guinness on tap, and a friendly atmosphere. Perfect for after-work drinks.",
+            city: "Casablanca",
+            category: "Bar",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'pub' } }))?.id,
+            address: "22 Rue des Irlandais",
+            phone: "+212 522 333 444",
+            website: "https://omalleys.ma",
+            instagram: "@omalleys_casa",
+            parkingAvailable: false,
+            valetParking: false,
+            reservationsEnabled: false,
+            dressCode: "Casual",
+            priceRange: "cheap",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1514933651103-005eec06c04b?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1585516499834-8c823eb52C28?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1572116469696-31de0f17cc34?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "La Java",
+            description: "A legendary spot in Casablanca. Casual dining, live music, and a relaxed garden atmosphere. Ideal for a laid-back evening.",
+            city: "Casablanca",
+            category: "Bar",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'bar' } }))?.id,
+            address: "Boulevard Abdellatif Ben Kaddour",
+            phone: "+212 522 123 456",
+            parkingAvailable: true,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Casual",
+            priceRange: "moderate",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1532635224-cf024e66d122?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1438907046657-4ae137eb8c5e?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1584225065152-4a1454aa3d42?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+
+        // --- CAFES & BAKERIES ---
+        {
+            name: "Bondi Coffee Kitchen",
+            description: "Australian-inspired cafe serving specialty coffee, healthy brunches, and delicious smoothies. A hipster haven in the city.",
+            city: "Casablanca",
+            category: "Restaurant",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'coffee_shop' } }))?.id,
+            address: "31 Rue Sebou, Gauthier",
+            phone: "+212 522 470 546",
+            instagram: "@bondicoffeekitchen",
+            parkingAvailable: false,
+            valetParking: false,
+            reservationsEnabled: false,
+            dressCode: "Casual",
+            priceRange: "moderate",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1521017432531-fbd92d768814?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "Paul - Villa Zevaco",
+            description: "Located in a stunning heritage villa. Paul offers traditional French breads, pastries, and a full bistro menu in a beautiful garden setting.",
+            city: "Casablanca",
+            category: "Restaurant",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'bakery' } }))?.id,
+            address: "Boulevard d'Anfa",
+            phone: "+212 522 366 000",
+            website: "https://paul.ma",
+            parkingAvailable: true,
+            valetParking: true,
+            reservationsEnabled: true,
+            dressCode: "Casual",
+            priceRange: "moderate",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "% Arabica",
+            description: "Kyoto-based specialty coffee shop. Minimalist design, world-class beans, and the perfect espresso. See the world through coffee.",
+            city: "Casablanca",
+            category: "Restaurant",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'coffee_shop' } }))?.id,
+            address: "Morocco Mall",
+            phone: "+212 522 999 555",
+            instagram: "@arabica.morocco",
+            parkingAvailable: true,
+            valetParking: false,
+            reservationsEnabled: false,
+            dressCode: "Casual",
+            priceRange: "moderate",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1445116572660-d38f22299d51?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1507133750069-775b0f0a6e2e?q=80&w=1000&auto=format&fit=crop"
+            ]
+        },
+        {
+            name: "L'Atelier 21",
+            description: "Art gallery and cafe. A cultural hub where you can enjoy fine coffee while admiring contemporary Moroccan art.",
+            city: "Casablanca",
+            category: "Restaurant",
+            venueTypeId: (await prisma.venueType.findFirst({ where: { subcategory_code: 'cafe' } }))?.id,
+            address: "21 Rue Abou Mahassine Arrouyani",
+            phone: "+212 522 981 785",
+            parkingAvailable: false,
+            valetParking: false,
+            reservationsEnabled: false,
+            dressCode: "Smart Casual",
+            priceRange: "moderate",
+            paymentMethods: ["Cash", "Credit Card"],
+            status: "APPROVED",
+            ownerId: user.id,
+            images: [
+                "https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1507679799987-c73779587ccf?q=80&w=1000&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?q=80&w=1000&auto=format&fit=crop"
+            ]
         }
     ];
 
     for (const v of sampleVenues) {
+        // Separate images and dynamic fields from the rest of the venue data
         // @ts-ignore
-        const existing = await prisma.venue.findFirst({ where: { name: v.name } });
+        const { images, priceRange, ...venueData } = v;
+
+        // @ts-ignore
+        const existing = await prisma.venue.findFirst({ where: { name: venueData.name } });
+
         if (!existing) {
             // @ts-ignore
-            await prisma.venue.create({ data: v });
+            const createdVenue = await prisma.venue.create({ data: venueData });
+            console.log(` Created venue: ${createdVenue.name}`);
+
+            // Create Media for images
+            if (images && images.length > 0) {
+                for (const imageUrl of images) {
+                    await prisma.media.create({
+                        data: {
+                            url: imageUrl,
+                            type: 'image',
+                            venueId: createdVenue.id
+                        }
+                    });
+                }
+                console.log(`   > Added ${images.length} images`);
+            }
+
+            // Handle Dynamic Attribute: Price Range
+            if (priceRange) {
+                await prisma.venueAttribute.create({
+                    data: {
+                        venueId: createdVenue.id,
+                        field_key: 'price_range',
+                        value_json: priceRange
+                    }
+                });
+            }
+
+        } else {
+            console.log(` Skipped existing venue: ${existing.name}`);
         }
     }
 

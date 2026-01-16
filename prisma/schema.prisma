@@ -17,6 +17,8 @@ model User {
   role          Role      @default(USER)
   emailVerificationToken String?
   emailVerificationExpiresAt DateTime?
+  birthday      DateTime?
+  gender        String?
   accounts      Account[]
   sessions      Session[]
   
@@ -65,6 +67,8 @@ model Venue {
   tagline             String?
   description         String?
   category            String?
+  ambiance            String?
+  cuisine             String?
   email               String?
 
   // Location
@@ -113,7 +117,7 @@ model Venue {
   media               Media[]
   reservations        Reservation[]
   reviews             Review[]
-  owner               User          @relation(fields: [ownerId], references: [id])
+  owner               User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   venueType           VenueType?    @relation(fields: [venueTypeId], references: [id])
   attributes          VenueAttribute[]
   events              Event[]
@@ -123,9 +127,11 @@ model Media {
   id        String   @id @default(cuid())
   url       String
   type      String
-  venueId   String
+  venueId   String?
+  eventId   String?
   createdAt DateTime @default(now())
-  venue     Venue    @relation(fields: [venueId], references: [id])
+  venue     Venue?   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  event     Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }
 
 model Reservation {
@@ -136,8 +142,8 @@ model Reservation {
   status    String
   qrToken   String   @unique
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-  venue     Venue    @relation(fields: [venueId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
 }
 
 model Review {
@@ -147,8 +153,8 @@ model Review {
   venueId   String
   userId    String
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-  venue     Venue    @relation(fields: [venueId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
 }
 
 model VenueType {
@@ -208,8 +214,13 @@ model Event {
   date        DateTime
   startTime   String?
   endTime     String?
+  
+  type        String? // e.g., "Music", "Art", "Conference", "Party"
+  genre       String? // e.g., "Techno", "Jazz", "Networking"
+  
   venueId     String
-  mediaUrl    String?
+  mediaUrl    String? // Legacy, prefer joining Media relation
+  media       Media[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

@@ -13,6 +13,13 @@ export default function ExplorePage() {
   const [filters, setFilters] = useState({
     city: "",
     category: "",
+    ambiance: "",
+    cuisine: "",
+    eventType: "",
+    eventGenre: "",
+    date: "",
+    startTime: "",
+    sort: "recommended",
     features: {} as Record<string, boolean>,
     dressCode: [] as string[],
     agePolicy: [] as string[],
@@ -21,6 +28,10 @@ export default function ExplorePage() {
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const updateFilter = (key: string, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
 
   async function load() {
     setLoading(true);
@@ -32,6 +43,13 @@ export default function ExplorePage() {
     // Standard filters
     if (filters.city) params.set("city", filters.city);
     if (filters.category) params.set("category", filters.category);
+    if (filters.ambiance) params.set("ambiance", filters.ambiance);
+    if (filters.cuisine) params.set("cuisine", filters.cuisine);
+    if (filters.eventType) params.set("eventType", filters.eventType);
+    if (filters.eventGenre) params.set("eventGenre", filters.eventGenre);
+    if (filters.date) params.set("date", filters.date);
+    if (filters.startTime) params.set("startTime", filters.startTime);
+    if (filters.sort) params.set("sort", filters.sort);
 
     // Features (boolean flags)
     Object.entries(filters.features).forEach(([available, isSelected]) => {
@@ -65,20 +83,30 @@ export default function ExplorePage() {
     let count = 0;
     if (filters.city) count++;
     if (filters.category) count++;
-    if (filters.features) count += Object.keys(filters.features).length;
-    if (filters.dressCode?.length) count++;
-    if (filters.paymentMethods?.length) count++;
+    if (filters.ambiance) count++;
+    if (filters.cuisine) count++;
+    if (filters.eventType) count++;
+    if (filters.eventGenre) count++;
+    if (filters.date) count++;
+    if (filters.startTime) count++;
+    if (filters.features) count += Object.values(filters.features).filter(Boolean).length;
+    count += (filters.dressCode?.length || 0);
+    count += (filters.agePolicy?.length || 0);
+    count += (filters.paymentMethods?.length || 0);
     return count;
   }, [filters]);
 
   return (
-    <div className="flex h-[calc(100vh-5rem)] overflow-hidden">
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block h-full">
+    <div className="flex flex-col lg:flex-row min-h-screen relative">
+      {/* Desktop Sidebar - Sticky */}
+      <div
+        className="hidden lg:block lg:sticky lg:top-24 w-80 h-fit max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-hide"
+        style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}
+      >
         <FilterSidebar
           filters={filters}
           setFilters={setFilters}
-          className="w-80 h-full border-r border-white/10"
+          className="w-full"
         />
       </div>
 
@@ -96,7 +124,7 @@ export default function ExplorePage() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto h-full relative scrollbar-hide">
+      <div className="flex-1 relative scrollbar-hide">
         <div className="max-w-7xl mx-auto pb-20 pt-8 px-4 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
             <div>
@@ -122,6 +150,16 @@ export default function ExplorePage() {
                   className="w-full rounded-xl border border-white/10 bg-white/5 pl-12 pr-4 py-3 text-white outline-none focus:bg-white/10 transition-colors"
                 />
               </div>
+
+              <select
+                value={filters.sort || "recommended"}
+                onChange={(e) => updateFilter("sort", e.target.value)}
+                className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <option value="recommended">Recommended</option>
+                <option value="top-rated">★ Top Rated</option>
+                <option value="newest">🕒 Newest First</option>
+              </select>
             </div>
           </div>
 
@@ -156,6 +194,8 @@ export default function ExplorePage() {
                   category={v.category}
                   imageUrl={coverImage}
                   rating={v.rating}
+                  ambiance={v.ambiance}
+                  cuisine={v.cuisine}
                 />
               );
             })}
@@ -167,7 +207,21 @@ export default function ExplorePage() {
                 <p className="mt-2 text-white/50">Try adjusting your filters or search terms.</p>
                 <button
                   onClick={() => {
-                    setFilters({ city: "", category: "", features: {}, dressCode: [], agePolicy: [], paymentMethods: [] });
+                    setFilters({
+                      city: "",
+                      category: "",
+                      ambiance: "",
+                      cuisine: "",
+                      eventType: "",
+                      eventGenre: "",
+                      date: "",
+                      startTime: "",
+                      sort: "recommended",
+                      features: {},
+                      dressCode: [],
+                      agePolicy: [],
+                      paymentMethods: []
+                    });
                     setQ("");
                   }}
                   className="mt-6 px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-zinc-200"

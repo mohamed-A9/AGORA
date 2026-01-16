@@ -19,6 +19,7 @@ const UpdateVenueSchema = z.object({
     phone: z.string().optional(),
     reservationsEnabled: z.boolean().optional(),
     ambiance: z.string().optional(),
+    cuisine: z.string().optional(),
     musicStyle: z.string().optional(),
     openingHours: z.string().optional(),
     weeklySchedule: z.any().optional(),
@@ -46,6 +47,7 @@ export async function updateVenue(formData: FormData) {
         phone: formData.get("phone") || undefined,
         reservationsEnabled: formData.get("reservationsEnabled") === "on",
         ambiance: formData.get("ambiance") || undefined,
+        cuisine: formData.get("cuisine") || undefined,
         musicStyle: formData.get("musicStyle") || undefined,
         openingHours: formData.get("openingHours") || undefined,
         weeklySchedule: formData.get("weeklySchedule") ? JSON.parse(formData.get("weeklySchedule") as string) : undefined,
@@ -61,10 +63,18 @@ export async function updateVenue(formData: FormData) {
     }
     const data = validated.data;
 
-    // Verify ownership
+    // Verify ownership or Admin
     const venue = await prisma.venue.findUnique({ where: { id: data.id } });
+
+    // Fetch fresh role
+    const dbUser = await prisma.user.findUnique({
+        where: { id: (session.user as any).id },
+        select: { role: true }
+    });
+    const role = dbUser?.role || "USER";
+
     // @ts-ignore
-    if (!venue || venue.ownerId !== session.user.id) return { error: "Forbidden" };
+    if (!venue || (venue.ownerId !== session.user.id && role !== "ADMIN")) return { error: "Forbidden" };
 
     try {
         // Transaction to update details and media
@@ -83,8 +93,9 @@ export async function updateVenue(formData: FormData) {
                     website: data.website,
                     phone: data.phone,
                     reservationsEnabled: data.reservationsEnabled,
-                    // ambiance: data.ambiance, // TODO: Add to schema or attributes
-                    // musicStyle: data.musicStyle, // TODO: Add to schema or attributes
+                    ambiance: data.ambiance,
+                    cuisine: data.cuisine,
+                    musicStyle: data.musicStyle,
                     openingHours: data.openingHours,
                     weeklySchedule: data.weeklySchedule ?? undefined,
                     // eventTypes: data.eventTypes // TODO: Add to schema or attributes
@@ -108,9 +119,16 @@ export async function updateVenue(formData: FormData) {
             }
         });
 
+
+
+        const updatedVenue = await prisma.venue.findUnique({
+            where: { id: data.id },
+            include: { media: true }
+        });
+
         revalidatePath(`/venue/${data.id}`);
         revalidatePath("/business/my-venues");
-        return { success: true };
+        return { success: true, venue: updatedVenue };
     } catch (e) {
         console.error(e);
         return { error: "Update failed" };
@@ -122,8 +140,16 @@ export async function deleteVenue(id: string) {
     if (!session || !session.user) return { error: "Unauthorized" };
 
     const venue = await prisma.venue.findUnique({ where: { id } });
+
+    // Fetch fresh role
+    const dbUser = await prisma.user.findUnique({
+        where: { id: (session.user as any).id },
+        select: { role: true }
+    });
+    const role = dbUser?.role || "USER";
+
     // @ts-ignore
-    if (!venue || venue.ownerId !== session.user.id) return { error: "Forbidden" };
+    if (!venue || (venue.ownerId !== session.user.id && role !== "ADMIN")) return { error: "Forbidden" };
 
     try {
         await prisma.venue.delete({ where: { id } });

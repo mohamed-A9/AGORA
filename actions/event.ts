@@ -15,6 +15,10 @@ const EventSchema = z.object({
     endTime: z.string().optional(),
     type: z.string().optional(),
     genre: z.string().optional(),
+    ambiance: z.string().optional(),
+    musicStyle: z.string().optional(),
+    ticketsEnabled: z.boolean().optional(),
+    ticketingUrl: z.string().url().optional().or(z.literal("")),
     media: z.array(z.object({
         url: z.string().url(),
         type: z.enum(["image", "video", "pdf"])
@@ -34,6 +38,10 @@ export async function createEvent(formData: FormData) {
         endTime: formData.get("endTime"),
         type: formData.get("type"),
         genre: formData.get("genre"),
+        ambiance: formData.get("ambiance"),
+        musicStyle: formData.get("musicStyle"),
+        ticketsEnabled: formData.get("ticketsEnabled") === "true",
+        ticketingUrl: formData.get("ticketingUrl"),
         media: JSON.parse(formData.get("mediaJson") as string || "[]")
     };
 
@@ -67,6 +75,10 @@ export async function createEvent(formData: FormData) {
                     endTime: data.endTime,
                     type: data.type,
                     genre: data.genre,
+                    ambiance: data.ambiance,
+                    musicStyle: data.musicStyle,
+                    ticketsEnabled: data.ticketsEnabled,
+                    ticketingUrl: data.ticketingUrl,
                     // mediaUrl: legacy, ignored
                 }
             });

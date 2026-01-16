@@ -8,11 +8,12 @@ export async function middleware(req: NextRequest) {
 
   // ✅ zones protégées
   const isProtected =
-    path === "/home" ||
-    path.startsWith("/dashboard") ||
-    path.startsWith("/admin") ||
-    path.startsWith("/business") ||
-    path.startsWith("/profile");
+    (path === "/home" ||
+      path.startsWith("/dashboard") ||
+      path.startsWith("/admin") ||
+      path.startsWith("/business") ||
+      path.startsWith("/profile")) &&
+    path !== "/business/about";
 
   // ✅ pas connecté -> login
   if (isProtected && !token) {
@@ -25,7 +26,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // ✅ business only (ADMIN autorisé)
-  if (path.startsWith("/business") && token?.role !== "BUSINESS" && token?.role !== "ADMIN") {
+  if (path.startsWith("/business") && path !== "/business/about" && token?.role !== "BUSINESS" && token?.role !== "ADMIN") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

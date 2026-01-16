@@ -26,7 +26,13 @@ export async function GET(request: Request) {
   const eventType = searchParams.get("eventType");
   const eventGenre = searchParams.get("eventGenre");
   const date = searchParams.get("date"); // YYYY-MM-DD
-  const startTime = searchParams.get("startTime");
+  const startTime = searchParams.get("startTime"); // For event search
+
+  // New Venue-specific time filters
+  const startHour = searchParams.get("startHour");
+  const endHour = searchParams.get("endHour");
+  const openingDays = searchParams.get("openingDays")?.split(",").filter(Boolean);
+
   const sort = searchParams.get("sort");
 
   // Build Where Clause
@@ -44,10 +50,19 @@ export async function GET(request: Request) {
     ];
   }
 
-  // 2. Exact Matches
-  if (city) where.city = city;
-  if (category) where.category = category;
-  if (ambiance) where.ambiance = ambiance;
+  // 2. Multi-Match Filters (Support for preferences)
+  if (city) {
+    const cities = city.split(",").filter(Boolean);
+    where.city = cities.length > 1 ? { in: cities } : cities[0];
+  }
+  if (category) {
+    const categories = category.split(",").filter(Boolean);
+    where.category = categories.length > 1 ? { in: categories } : categories[0];
+  }
+  if (ambiance) {
+    const ambiances = ambiance.split(",").filter(Boolean);
+    where.ambiance = ambiances.length > 1 ? { in: ambiances } : ambiances[0];
+  }
   if (cuisine) where.cuisine = cuisine;
 
   // 3. Features
@@ -64,6 +79,17 @@ export async function GET(request: Request) {
   }
   if (paymentMethods && paymentMethods.length > 0) {
     where.paymentMethods = { hasSome: paymentMethods };
+  }
+
+  // 4a. Opening Hours/Days
+  if (startHour) {
+    where.startHour = { lte: startHour }; // Venue must open before or at requested time
+  }
+  if (endHour) {
+    where.endHour = { gte: endHour }; // Venue must close after or at requested time
+  }
+  if (openingDays && openingDays.length > 0) {
+    where.openingDays = { hasSome: openingDays };
   }
 
   // 5. Event Filters (Filtering Venues by their Events)

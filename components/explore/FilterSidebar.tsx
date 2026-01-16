@@ -164,7 +164,7 @@ export default function FilterSidebar({ filters, setFilters, className = "", onC
                 {/* Date & Time Selection */}
                 <div className="space-y-3">
                     <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("date")}>
-                        <h3 className="font-semibold text-white">Date & Time</h3>
+                        <h3 className="font-semibold text-white">Events Date & Time</h3>
                         {expandedSection === "date" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
                     </div>
                     {expandedSection === "date" && (
@@ -176,13 +176,68 @@ export default function FilterSidebar({ filters, setFilters, className = "", onC
                                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
                             />
                             <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-bold text-zinc-500 px-1">Starting After</label>
+                                <label className="text-[10px] uppercase font-bold text-zinc-500 px-1">Starting After (Events)</label>
                                 <input
                                     type="time"
                                     value={filters.startTime || ""}
                                     onChange={(e) => updateFilter("startTime", e.target.value)}
                                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
                                 />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="h-px bg-white/5" />
+
+                {/* Opening Hours Filter */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("opening")}>
+                        <h3 className="font-semibold text-white">Opening Hours</h3>
+                        {expandedSection === "opening" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
+                    </div>
+                    {expandedSection === "opening" && (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <p className="text-[10px] uppercase font-bold text-zinc-500 px-1">Days</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => (
+                                        <button
+                                            key={day}
+                                            onClick={() => {
+                                                const current = filters.openingDays || [];
+                                                const next = current.includes(day) ? current.filter((d: string) => d !== day) : [...current, day];
+                                                updateFilter("openingDays", next);
+                                            }}
+                                            className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${filters.openingDays?.includes(day)
+                                                ? "bg-indigo-600 text-white"
+                                                : "bg-white/5 text-white/50 border border-white/5"
+                                                }`}
+                                        >
+                                            {day.slice(0, 3)}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] uppercase font-bold text-zinc-500 px-1">Open At</label>
+                                    <input
+                                        type="time"
+                                        value={filters.startHour || ""}
+                                        onChange={(e) => updateFilter("startHour", e.target.value)}
+                                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm outline-none"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] uppercase font-bold text-zinc-500 px-1">Close At</label>
+                                    <input
+                                        type="time"
+                                        value={filters.endHour || ""}
+                                        onChange={(e) => updateFilter("endHour", e.target.value)}
+                                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm outline-none"
+                                    />
+                                </div>
                             </div>
                         </div>
                     )}
@@ -318,7 +373,24 @@ export default function FilterSidebar({ filters, setFilters, className = "", onC
             {/* Footer Actions */}
             <div className="p-4 mt-auto">
                 <button
-                    onClick={() => setFilters({})}
+                    onClick={() => setFilters({
+                        city: "",
+                        category: "",
+                        ambiance: "",
+                        cuisine: "",
+                        eventType: "",
+                        eventGenre: "",
+                        date: "",
+                        startTime: "",
+                        sort: "recommended",
+                        features: {},
+                        dressCode: [],
+                        agePolicy: [],
+                        paymentMethods: [],
+                        openingDays: [],
+                        startHour: "",
+                        endHour: ""
+                    })}
                     className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium transition-colors text-sm border border-white/10"
                 >
                     Reset Filters

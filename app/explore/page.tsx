@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import VenueCard from "@/components/VenueCard";
 import FilterSidebar from "@/components/explore/FilterSidebar";
 import { Filter, Search } from "lucide-react";
+import { VENUE_CATEGORIES, AMBIANCES } from "@/lib/constants";
 
-export default function ExplorePage() {
+function ExploreContent() {
+  const searchParams = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
   const [q, setQ] = useState("");
 
-  // Complex filter state
   const [filters, setFilters] = useState({
     city: "",
     category: "",
@@ -24,10 +26,46 @@ export default function ExplorePage() {
     dressCode: [] as string[],
     agePolicy: [] as string[],
     paymentMethods: [] as string[],
+    openingDays: [] as string[],
+    startHour: "",
+    endHour: "",
   });
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [prefLoading, setPrefLoading] = useState(true);
+
+  async function fetchUserPrefs() {
+    try {
+      const res = await fetch("/api/user/preferences");
+      if (res.ok) {
+        const data = await res.json();
+        // Only apply if no explicit URL param for those keys
+        const qParam = searchParams.get("q");
+        const cityParam = searchParams.get("city");
+        const categoryParam = searchParams.get("category");
+        const ambianceParam = searchParams.get("ambiance");
+        const vibeParam = searchParams.get("vibe");
+
+        if (!qParam && !cityParam && !categoryParam && !ambianceParam && !vibeParam) {
+          setFilters(prev => ({
+            ...prev,
+            city: data.preferredCities?.join(",") || "",
+            category: data.preferredCategories?.join(",") || "",
+            ambiance: data.preferredAmbiances?.join(",") || "",
+          }));
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch user preferences", e);
+    } finally {
+      setPrefLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchUserPrefs();
+  }, []);
 
   const updateFilter = (key: string, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -37,10 +75,7 @@ export default function ExplorePage() {
     setLoading(true);
     const params = new URLSearchParams();
 
-    // Search query
     if (q.trim()) params.set("q", q.trim());
-
-    // Standard filters
     if (filters.city) params.set("city", filters.city);
     if (filters.category) params.set("category", filters.category);
     if (filters.ambiance) params.set("ambiance", filters.ambiance);
@@ -50,13 +85,16 @@ export default function ExplorePage() {
     if (filters.date) params.set("date", filters.date);
     if (filters.startTime) params.set("startTime", filters.startTime);
     if (filters.sort) params.set("sort", filters.sort);
+    if (filters.startHour) params.set("startHour", filters.startHour);
+    if (filters.endHour) params.set("endHour", filters.endHour);
+    if (filters.openingDays?.length) params.set("openingDays", filters.openingDays.join(","));
 
-    // Features (boolean flags)
-    Object.entries(filters.features).forEach(([available, isSelected]) => {
-      if (isSelected) params.set(available, "true");
-    });
+    if (filters.features) {
+      Object.entries(filters.features).forEach(([available, isSelected]) => {
+        if (isSelected) params.set(available, "true");
+      });
+    }
 
-    // Array filters (comma separated)
     if (filters.dressCode?.length) params.set("dressCode", filters.dressCode.join(","));
     if (filters.agePolicy?.length) params.set("agePolicy", filters.agePolicy.join(","));
     if (filters.paymentMethods?.length) params.set("paymentMethods", filters.paymentMethods.join(","));
@@ -72,11 +110,9 @@ export default function ExplorePage() {
     setLoading(false);
   }
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(load, 300);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, filters]);
 
   const activeFilterCount = useMemo(() => {
@@ -93,33 +129,49 @@ export default function ExplorePage() {
     count += (filters.dressCode?.length || 0);
     count += (filters.agePolicy?.length || 0);
     count += (filters.paymentMethods?.length || 0);
+    count += (filters.openingDays?.length || 0);
+    if (filters.startHour) count++;
+    if (filters.endHour) count++;
     return count;
   }, [filters]);
 
+  useEffect(() => {
+    const qParam = searchParams.get("q");
+    const cityParam = searchParams.get("city");
+    const categoryParam = searchParams.get("category");
+    const ambianceParam = searchParams.get("ambiance");
+    const vibeParam = searchParams.get("vibe");
+
+    if (qParam) setQ(qParam);
+
+    setFilters(prev => {
+      const newFilters = { ...prev };
+      if (cityParam) newFilters.city = cityParam;
+      if (categoryParam) newFilters.category = categoryParam;
+      if (ambianceParam) newFilters.ambiance = ambianceParam;
+
+      if (vibeParam) {
+        if (VENUE_CATEGORIES.includes(vibeParam)) {
+          newFilters.category = vibeParam;
+        } else if (AMBIANCES.includes(vibeParam)) {
+          newFilters.ambiance = vibeParam;
+        }
+      }
+      return newFilters;
+    });
+  }, [searchParams]);
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen relative">
-      {/* Desktop Sidebar - Sticky */}
-      <div
-        className="hidden lg:block lg:sticky lg:top-24 w-80 h-fit max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-hide"
-        style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}
-      >
-        <FilterSidebar
-          filters={filters}
-          setFilters={setFilters}
-          className="w-full"
-        />
+      <div className="hidden lg:block lg:sticky lg:top-24 w-80 h-fit max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-hide">
+        <FilterSidebar filters={filters} setFilters={setFilters} className="w-full" />
       </div>
 
-      {/* Mobile Filter Sheet Overlay */}
       {showFilters && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowFilters(false)} />
           <div className="relative w-[300px] h-full bg-zinc-900 shadow-2xl animate-in slide-in-from-left">
-            <FilterSidebar
-              filters={filters}
-              setFilters={setFilters}
-              onClose={() => setShowFilters(false)}
-            />
+            <FilterSidebar filters={filters} setFilters={setFilters} onClose={() => setShowFilters(false)} />
           </div>
         </div>
       )}
@@ -161,19 +213,6 @@ export default function ExplorePage() {
                 <option value="newest">🕒 Newest First</option>
               </select>
             </div>
-          </div>
-
-          {/* Categories Quick Bar (optional, redundant with sidebar but nice for UX) */}
-          <div className="lg:hidden flex gap-3 overflow-x-auto pb-4 mb-4 scrollbar-hide">
-            {['Restaurant', 'Club', 'Cafe', 'Rooftop'].map(cat => (
-              <button
-                key={cat}
-                onClick={() => setFilters({ ...filters, category: filters.category === cat ? "" : cat })}
-                className={`px-4 py-2 rounded-full border border-white/10 text-sm font-medium whitespace-nowrap transition-colors ${filters.category === cat ? 'bg-white text-black' : 'bg-white/5 text-white/70'}`}
-              >
-                {cat}
-              </button>
-            ))}
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -220,7 +259,10 @@ export default function ExplorePage() {
                       features: {},
                       dressCode: [],
                       agePolicy: [],
-                      paymentMethods: []
+                      paymentMethods: [],
+                      openingDays: [],
+                      startHour: "",
+                      endHour: ""
                     });
                     setQ("");
                   }}
@@ -234,5 +276,17 @@ export default function ExplorePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ExplorePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ExploreContent />
+    </Suspense>
   );
 }

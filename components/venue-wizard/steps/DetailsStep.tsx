@@ -18,6 +18,11 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
     const [ambiance, setAmbiance] = useState(initialData?.ambiance || "");
     const [cuisine, setCuisine] = useState(initialData?.cuisine || "");
 
+    // Opening Hours
+    const [openingDays, setOpeningDays] = useState<string[]>(initialData?.openingDays || []);
+    const [startHour, setStartHour] = useState(initialData?.startHour || "");
+    const [endHour, setEndHour] = useState(initialData?.endHour || "");
+
     // Policies - Initialize from initialData
     const [dressCode, setDressCode] = useState(initialData?.dressCode || "");
     const [agePolicy, setAgePolicy] = useState(initialData?.agePolicy || "");
@@ -54,7 +59,10 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
             valetParking,
             reservationsEnabled,
             ambiance,
-            cuisine
+            cuisine,
+            openingDays,
+            startHour,
+            endHour
         });
 
         if (res?.success) {
@@ -62,7 +70,7 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
                 phone, website, instagram,
                 dressCode, agePolicy, paymentMethods,
                 parkingAvailable, valetParking, reservationsEnabled,
-                ambiance, cuisine
+                ambiance, cuisine, openingDays, startHour, endHour
             });
         } else {
             console.error("Details Step Error:", res?.error);
@@ -95,6 +103,57 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
                             <option value="">Select Style...</option>
                             {CUISINES.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
+                    </div>
+                </div>
+            </div>
+
+            {/* Opening Hours */}
+            <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white border-b border-white/10 pb-2">Opening Schedule</h3>
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-sm text-zinc-400">Opening Days</label>
+                        <div className="flex flex-wrap gap-2">
+                            {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => (
+                                <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => {
+                                        if (openingDays.includes(day)) {
+                                            setOpeningDays(openingDays.filter(d => d !== day));
+                                        } else {
+                                            setOpeningDays([...openingDays, day]);
+                                        }
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${openingDays.includes(day)
+                                        ? "bg-indigo-600 border-indigo-500 text-white"
+                                        : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                                        }`}
+                                >
+                                    {day.slice(0, 3)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-sm text-zinc-400">Opening Time</label>
+                            <input
+                                type="time"
+                                value={startHour}
+                                onChange={e => setStartHour(e.target.value)}
+                                className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm text-zinc-400">Closing Time</label>
+                            <input
+                                type="time"
+                                value={endHour}
+                                onChange={e => setEndHour(e.target.value)}
+                                className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none"
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -205,6 +264,39 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
                             <input type="checkbox" checked={valetParking} onChange={e => setValetParking(e.target.checked)} className="hidden" />
                             <span className="text-white">Valet Service</span>
                         </label>
+                    </div>
+
+                    {/* New Amenities Section */}
+                    <h4 className="text-md font-semibold text-white mt-6 mb-3">Amenities & Accessibility</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
+                            <input type="checkbox" name="hasDanceFloor" className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
+                            <label className="text-white font-medium">Dance Floor</label>
+                        </div>
+                        <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
+                            <input type="checkbox" name="wheelchairAccessible" className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
+                            <label className="text-white font-medium">Wheelchair Accessible</label>
+                        </div>
+                        <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
+                            <input type="checkbox" name="hasBabyChairs" className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
+                            <label className="text-white font-medium">Baby Chairs Available</label>
+                        </div>
+                    </div>
+
+                    <h4 className="text-md font-semibold text-white mt-6 mb-3">Dietary Options</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
+                            <input type="checkbox" name="hasGlutenFreeOptions" className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
+                            <label className="text-white font-medium">Gluten-Free Options</label>
+                        </div>
+                        <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
+                            <input type="checkbox" name="hasSugarFreeOptions" className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
+                            <label className="text-white font-medium">Sugar-Free Options</label>
+                        </div>
+                        <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
+                            <input type="checkbox" name="hasSaltFreeOptions" className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600" />
+                            <label className="text-white font-medium">Salt-Free/Low Sodium</label>
+                        </div>
                     </div>
                 </div>
 

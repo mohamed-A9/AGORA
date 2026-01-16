@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, MapPin, Globe, Phone, Share, Heart, X, ChevronLeft, ChevronRight, Play, FileText, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, MapPin, Globe, Phone, Share, Heart, X, ChevronLeft, ChevronRight, Play, FileText, Edit, Trash2, Star, User } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { deleteVenue } from "@/actions/venue";
 
@@ -179,7 +179,11 @@ export default function VenueDetailPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-4 text-white/70 text-sm md:text-base">
-          <span className="font-semibold text-white">{venue.rating ? `★ ${venue.rating}` : 'New'}</span>
+          <span className="font-semibold text-white">
+            {venue.reviews?.length > 0
+              ? `★ ${(venue.reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / venue.reviews.length).toFixed(1)}`
+              : '★ Nouveau'}
+          </span>
           <span>•</span>
           <span className="text-white hover:underline cursor-pointer">{venue.city}, Morocco</span>
           <span>•</span>
@@ -316,7 +320,7 @@ export default function VenueDetailPage() {
           {pdfs.length > 0 && (
             <div>
               <h2 className="text-xl font-bold text-white mb-4">Menus & Info</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-white/10 pb-8">
                 {pdfs.map((m: any) => (
                   <a key={m.id} href={m.url} target="_blank" className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors group">
                     <div className="p-3 bg-red-500/10 rounded-lg text-red-400 group-hover:scale-110 transition-transform">
@@ -331,6 +335,54 @@ export default function VenueDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Reviews Section */}
+          <div className="pt-4">
+            <div className="flex items-center gap-4 mb-6">
+              <h2 className="text-2xl font-bold text-white">Avis vérifiés</h2>
+              <div className="px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-sm font-bold">
+                ★ {venue.reviews?.length > 0
+                  ? (venue.reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / venue.reviews.length).toFixed(1)
+                  : "Nouveau"}
+              </div>
+              <span className="text-white/40 text-sm">{venue.reviews?.length || 0} avis</span>
+            </div>
+
+            <div className="grid gap-6">
+              {venue.reviews?.length > 0 ? (
+                venue.reviews.map((rev: any) => (
+                  <div key={rev.id} className="p-6 rounded-[2rem] border border-white/5 bg-white/[0.02] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/40 border border-white/10">
+                          <User className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-white">{rev.user?.name || "Anonyme"}</div>
+                          <div className="text-[10px] text-white/30 uppercase tracking-widest font-black">Client vérifié</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star key={s} size={12} className={rev.rating >= s ? "text-amber-400 fill-amber-400" : "text-white/10"} />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-white/70 text-sm leading-relaxed italic">
+                      "{rev.comment || "Aucun commentaire."}"
+                    </p>
+                    <div className="text-[10px] text-white/20">
+                      Publié le {new Date(rev.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-10 text-center border-2 border-dashed border-white/5 rounded-[2rem]">
+                  <p className="text-white/30">Soyez le premier à donner votre avis après votre visite !</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Right Column: Sticky Reservation */}
@@ -418,6 +470,50 @@ export default function VenueDetailPage() {
           </div>
         </div>
       </div>
+      {/* Events section if any */}
+      {venue.events?.length > 0 && (
+        <div className="mt-16 space-y-8">
+          <h2 className="text-3xl font-black text-white px-2">Prochaines Soirées</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {venue.events.map((ev: any) => (
+              <div key={ev.id} className="group relative rounded-[2.5rem] border border-white/10 bg-white/5 overflow-hidden flex flex-col">
+                <div className="aspect-[16/10] overflow-hidden grayscale group-hover:grayscale-0 transition-all duration-700">
+                  <img src={ev.media?.[0]?.url || "/logo.png"} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={ev.name} />
+                </div>
+                <div className="p-8 space-y-4 flex-1 flex flex-col">
+                  <div>
+                    <div className="text-sm font-black text-indigo-400 uppercase tracking-widest mb-1">{ev.type}</div>
+                    <h3 className="text-2xl font-black text-white">{ev.name}</h3>
+                  </div>
+                  <div className="flex items-center gap-3 text-white/40 text-sm font-medium">
+                    <Calendar className="w-4 h-4" />
+                    <span>{new Date(ev.date).toLocaleDateString()}</span>
+                  </div>
+                  <p className="text-white/60 text-sm line-clamp-2">{ev.description}</p>
+
+                  <div className="mt-auto pt-4">
+                    {ev.ticketsEnabled && ev.ticketingUrl ? (
+                      <a
+                        href={ev.ticketingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-white text-black font-black py-4 hover:bg-zinc-200 transition-all hover:scale-[1.02]"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Acheter des billets
+                      </a>
+                    ) : (
+                      <div className="text-center text-[10px] text-white/20 uppercase font-black py-2 tracking-widest">
+                        Entrée libre / Réservation standard
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

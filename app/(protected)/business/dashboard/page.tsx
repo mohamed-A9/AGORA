@@ -72,6 +72,13 @@ export default function BusinessDashboardPage() {
               primary
             />
             <ActionCard
+              title="Special Nights"
+              desc="Gérez vos événements, soirées éphémères et billetteries."
+              icon={Calendar}
+              onClick={() => router.push("/business/events")}
+              primary
+            />
+            <ActionCard
               title="My Venues"
               desc="Edit details, manage events, and update photos."
               icon={LayoutDashboard}
@@ -80,7 +87,7 @@ export default function BusinessDashboardPage() {
             <ActionCard
               title="Reservations"
               desc="Track bookings and manage guest lists."
-              icon={Calendar}
+              icon={Users}
               onClick={() => router.push("/business/reservations")}
             />
             <ActionCard

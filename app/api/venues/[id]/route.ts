@@ -16,6 +16,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
           include: { media: true }
         },
         owner: { select: { id: true, name: true } },
+        reviews: {
+          include: { user: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 

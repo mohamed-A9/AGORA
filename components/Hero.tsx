@@ -1,61 +1,116 @@
+"use client";
+
 import Link from "next/link";
+import { Search, MapPin, ChevronRight, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import SearchDropdown from "./home/SearchDropdown";
+import { moroccanCities, AMBIANCES, VENUE_CATEGORIES } from "@/lib/constants";
 
 export default function Hero() {
+  const router = useRouter();
+  const [city, setCity] = useState("");
+  const [vibe, setVibe] = useState("");
+
+  const handleSearch = () => {
+    const params = new URLSearchParams();
+    if (city) params.set("city", city);
+    if (vibe) params.set("vibe", vibe); // New generic vibe param
+    router.push(`/explore?${params.toString()}`);
+  };
+
   return (
-    <div className="relative isolate px-6 pt-14 lg:px-8 bg-zinc-900 border-b border-white/5">
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
-      >
-        <div
-          style={{
-            clipPath:
-              "polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)",
-          }}
-          className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-20 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
-        />
-      </div>
-      <div className="mx-auto max-w-2xl py-20 sm:py-32 lg:py-40">
-        <div className="hidden sm:mb-8 sm:flex sm:justify-center">
-          <div className="relative rounded-full px-3 py-1 text-sm/6 text-gray-400 ring-1 ring-white/10 hover:ring-white/20">
-            Discover the best of Morocco.{" "}
-            <Link href="/explore" className="font-semibold text-white">
-              <span aria-hidden="true" className="absolute inset-0" />
-              Start Exploring <span aria-hidden="true">&rarr;</span>
-            </Link>
+    <div className="relative z-20 min-h-[80vh] flex flex-col items-center justify-center px-6">
+
+      <div className="mx-auto max-w-4xl text-center space-y-12 w-full">
+        <div className="space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-md text-sm font-medium text-white/80 animate-fade-in">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+            Discover the Elite of Moroccan Experiences
           </div>
-        </div>
-        <div className="text-center">
-          <h1 className="text-5xl font-semibold tracking-tight text-white sm:text-7xl animate-fade-in">
-            The Heart of Moroccan Nightlife & Experiences
+
+          <h1 className="text-5xl md:text-8xl font-black tracking-tight text-white animate-slide-up leading-[0.9]">
+            THE HEART OF <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+              NIGHTLIFE
+            </span>
           </h1>
-          <p className="mt-8 text-lg font-medium text-pretty text-gray-400 sm:text-xl/8 animate-slide-up">
-            Find the perfect restaurant, handle reservations, and discover hidden gems in your city. AGORA connects you to the best moments.
+
+          <p className="max-w-xl mx-auto text-lg md:text-xl text-white/60 font-medium animate-slide-up-delay">
+            Curating the finest destinations in Morocco. From mystical rooftops
+            to high-energy clubs, your next memory starts here.
           </p>
-          <div className="mt-10 flex items-center justify-center gap-x-6 animate-slide-up-delay">
-            <Link
-              href="/explore"
-              className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            >
-              Find a Place
-            </Link>
-            <Link href="/signup?role=business" className="text-sm/6 font-semibold text-white">
-              For Business <span aria-hidden="true">→</span>
-            </Link>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up-delay pt-4">
+          <Link
+            href="/explore"
+            className="w-full sm:w-auto px-10 py-5 bg-white text-black text-lg font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-zinc-200 transition-all hover:scale-105 active:scale-95 shadow-[0_0_40px_rgba(255,255,255,0.2)]"
+          >
+            Start Exploring
+            <ChevronRight className="w-5 h-5" />
+          </Link>
+
+          <Link
+            href="#partner-program"
+            className="w-full sm:w-auto px-10 py-5 bg-white/5 border border-white/10 text-white text-lg font-bold rounded-2xl hover:bg-white/10 transition-all backdrop-blur-md"
+          >
+            List Your Business
+          </Link>
+        </div>
+
+        <div className="hidden md:flex flex-col items-center gap-4">
+          <div className="w-full max-w-3xl flex bg-black/40 backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl animate-fade-in divide-x divide-white/5 p-1">
+            <SearchDropdown
+              label="What are you looking for?"
+              placeholder="Select Vibe"
+              value={vibe}
+              onChange={setVibe}
+              options={Array.from(new Set([...VENUE_CATEGORIES, ...AMBIANCES]))}
+              icon={<Sparkles className="w-5 h-5" />}
+            />
+
+            <SearchDropdown
+              label="Where to?"
+              placeholder="Select City"
+              value={city}
+              onChange={setCity}
+              options={moroccanCities}
+              icon={<MapPin className="w-5 h-5" />}
+            />
+
+            <div className="flex items-center px-4">
+              <button
+                onClick={handleSearch}
+                className="px-10 h-14 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-lg shadow-indigo-500/20"
+              >
+                Discover
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 group cursor-default">
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 group-hover:bg-yellow-300 transition-colors animate-pulse shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
+            <p className="text-[10px] font-black text-yellow-400 tracking-[0.3em] uppercase transition-colors group-hover:text-yellow-300 drop-shadow-[0_0_8px_rgba(250,204,21,0.3)] flex items-center gap-2">
+              Beyond Morocco
+              <img
+                src="https://flagcdn.com/w40/ma.png"
+                alt="Morocco"
+                className="w-4 h-3.5 object-cover rounded-sm border border-white/10"
+              />
+              — More countries coming soon
+            </p>
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 group-hover:bg-yellow-300 transition-colors animate-pulse shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
           </div>
         </div>
       </div>
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 top-[calc(100%-13rem)] -z-10 transform-gpu overflow-hidden blur-3xl sm:top-[calc(100%-30rem)]"
+      <div className="absolute bottom-10 left-10 flex flex-col items-center gap-2 animate-bounce cursor-pointer group"
+        onClick={() => document.getElementById('partner-program')?.scrollIntoView({ behavior: 'smooth' })}
       >
-        <div
-          style={{
-            clipPath:
-              "polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)",
-          }}
-          className="relative left-[calc(50%+3rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-20 sm:left-[calc(50%+36rem)] sm:w-[72.1875rem]"
-        />
+        <p className="text-[10px] font-bold text-white/20 tracking-[0.2em] uppercase group-hover:text-white/40 transition-colors">
+          Scroll
+        </p>
+        <ChevronRight className="w-5 h-5 text-white/20 rotate-90 group-hover:text-white/40 transition-colors" />
       </div>
     </div>
   );

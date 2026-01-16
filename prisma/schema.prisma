@@ -17,12 +17,18 @@ model User {
   role          Role      @default(USER)
   emailVerificationToken String?
   emailVerificationExpiresAt DateTime?
+  resetPasswordToken String?
+  resetPasswordExpiresAt DateTime?
   birthday      DateTime?
   gender        String?
   accounts      Account[]
   sessions      Session[]
   
-  // Custom fields
+  // Preferences
+  preferredCities     String[]
+  preferredCategories String[]
+  preferredAmbiances  String[]
+
   phone         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -67,6 +73,8 @@ model Venue {
   tagline             String?
   description         String?
   category            String?
+  subcategory         String?
+  specialization      String?
   ambiance            String?
   cuisine             String?
   email               String?
@@ -94,6 +102,31 @@ model Venue {
   approvedAt          DateTime?
   approvedBy          String?
   
+  // Operational
+  hasOutdoorSeating   Boolean       @default(false)
+  hasSmokingArea      Boolean       @default(false)
+  hasLiveMusic        Boolean       @default(false)
+  hasDJ               Boolean       @default(false)
+  hasPrivateRooms     Boolean       @default(false)
+  hasHeaters          Boolean       @default(false)
+  hasAC               Boolean       @default(false)
+  hasTV               Boolean       @default(false)
+  hasProjector        Boolean       @default(false)
+  hasStage            Boolean       @default(false)
+  hasMicrophone       Boolean       @default(false)
+  hasSoundSystem      Boolean       @default(false)
+  hasValetParking     Boolean       @default(false)
+  hasParking          Boolean       @default(false)
+  hasWifi             Boolean       @default(false)
+  isPetFriendly       Boolean       @default(false)
+  isFamilyFriendly    Boolean       @default(false)
+  isWheelchairAccessible Boolean    @default(false)
+  hasDanceFloor       Boolean       @default(false)
+  hasGlutenFreeOptions Boolean      @default(false)
+  hasSugarFreeOptions Boolean       @default(false)
+  hasSaltFreeOptions  Boolean       @default(false)
+  hasBabyChairs       Boolean       @default(false)
+  
   // Facilities
   parkingAvailable    Boolean       @default(false)
   valetParking        Boolean       @default(false)
@@ -111,6 +144,9 @@ model Venue {
   // Legacy/Other
   reservationsEnabled Boolean       @default(true)
   openingHours        String?
+  openingDays         String[]      // e.g. ["Monday", "Tuesday"]
+  startHour           String?       // e.g. "09:00"
+  endHour             String?       // e.g. "23:00"
   weeklySchedule      Json?
   startDate           DateTime?
   endDate             DateTime?
@@ -217,6 +253,11 @@ model Event {
   
   type        String? // e.g., "Music", "Art", "Conference", "Party"
   genre       String? // e.g., "Techno", "Jazz", "Networking"
+  ambiance    String? // Event-specific ambiance
+  musicStyle  String? // Detailed music style if type is Music/Nightlife
+  
+  ticketsEnabled Boolean  @default(false)
+  ticketingUrl   String?
   
   venueId     String
   mediaUrl    String? // Legacy, prefer joining Media relation

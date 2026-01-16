@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { updateVenueStep } from "@/actions/venue";
-import { moroccanCities } from "@/lib/constants";
+import { moroccanCities, TIME_SLOTS } from "@/lib/constants";
 
 // Helper for days
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -123,11 +123,63 @@ export default function LocationStep({ venueId, onNext, onBack, initialData }: {
 
                             <div className="hidden md:block w-px h-6 bg-white/10"></div>
 
-                            <div className="flex items-center gap-2 flex-1">
+                            <div className="flex items-center gap-1.5 flex-1">
                                 <span className="text-sm text-zinc-500">Open</span>
-                                <input type="time" value={row.open} onChange={e => updateRow(idx, 'open', e.target.value)} className="bg-zinc-900 border-zinc-700 rounded px-2 py-1 text-sm text-white" />
-                                <span className="text-sm text-zinc-500">Close</span>
-                                <input type="time" value={row.close} onChange={e => updateRow(idx, 'close', e.target.value)} className="bg-zinc-900 border-zinc-700 rounded px-2 py-1 text-sm text-white" />
+                                <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded px-2 py-1">
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={2}
+                                        value={row.open.split(':')[0]}
+                                        onChange={e => {
+                                            const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                            updateRow(idx, 'open', `${val.padStart(2, '0')}:${row.open.split(':')[1] || '00'}`);
+                                        }}
+                                        className="w-8 bg-transparent text-sm text-white text-center outline-none"
+                                        placeholder="HH"
+                                    />
+                                    <span className="text-zinc-500">:</span>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={2}
+                                        value={row.open.split(':')[1]}
+                                        onChange={e => {
+                                            const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                            updateRow(idx, 'open', `${row.open.split(':')[0] || '00'}:${val.padStart(2, '0')}`);
+                                        }}
+                                        className="w-8 bg-transparent text-sm text-white text-center outline-none"
+                                        placeholder="mm"
+                                    />
+                                </div>
+                                <span className="text-sm text-zinc-500 ml-1">Close</span>
+                                <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded px-2 py-1">
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={2}
+                                        value={row.close.split(':')[0]}
+                                        onChange={e => {
+                                            const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                            updateRow(idx, 'close', `${val.padStart(2, '0')}:${row.close.split(':')[1] || '00'}`);
+                                        }}
+                                        className="w-8 bg-transparent text-sm text-white text-center outline-none"
+                                        placeholder="HH"
+                                    />
+                                    <span className="text-zinc-500">:</span>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={2}
+                                        value={row.close.split(':')[1]}
+                                        onChange={e => {
+                                            const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                            updateRow(idx, 'close', `${row.close.split(':')[0] || '00'}:${val.padStart(2, '0')}`);
+                                        }}
+                                        className="w-8 bg-transparent text-sm text-white text-center outline-none"
+                                        placeholder="mm"
+                                    />
+                                </div>
                             </div>
 
                             {scheduleRows.length > 1 && (

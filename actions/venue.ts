@@ -13,6 +13,8 @@ export async function createVenueDraft(prevState: any, formData: FormData) {
 
     const name = formData.get("name") as string;
     const category = formData.get("category") as string;
+    const subcategory = formData.get("subcategory") as string;
+    const specialization = formData.get("specialization") as string;
     const tagline = formData.get("tagline") as string;
     const description = formData.get("description") as string;
 
@@ -25,6 +27,8 @@ export async function createVenueDraft(prevState: any, formData: FormData) {
             data: {
                 name,
                 category,
+                subcategory,
+                specialization,
                 tagline,
                 description,
                 city: "Pending",
@@ -74,6 +78,8 @@ const VenueSchema = z.object({
     description: z.string().optional(),
     city: z.string().min(1, "City is required"),
     category: z.string().min(1, "Category is required"),
+    subcategory: z.string().optional(),
+    specialization: z.string().optional(),
     address: z.string().optional(),
     locationUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
     website: z.string().url("Must be a valid URL").optional().or(z.literal("")),
@@ -84,11 +90,20 @@ const VenueSchema = z.object({
     musicStyle: z.string().optional(),
     openingHours: z.string().optional(),
     weeklySchedule: z.any().optional(),
+    openingDays: z.array(z.string()).optional(),
+    startHour: z.string().optional(),
+    endHour: z.string().optional(),
     startDate: z.string().optional(), // Receive as string from form
     endDate: z.string().optional(),   // Receive as string from form
     eventTypes: z.array(z.string()).optional(),
     venueTypeId: z.number().optional(), // New field
     attributes: z.record(z.string(), z.any()).optional(), // Dynamic attributes
+    hasDanceFloor: z.boolean().optional(),
+    wheelchairAccessible: z.boolean().optional(),
+    hasGlutenFreeOptions: z.boolean().optional(),
+    hasSugarFreeOptions: z.boolean().optional(),
+    hasSaltFreeOptions: z.boolean().optional(),
+    hasBabyChairs: z.boolean().optional(),
     media: z.array(z.object({
         url: z.string().url(),
         type: z.enum(["image", "video", "pdf"])
@@ -157,6 +172,8 @@ export async function createVenue(prevState: any, formData: FormData) {
         description: formData.get("description"),
         city: formData.get("city"),
         category: formData.get("category"),
+        subcategory: formData.get("subcategory"),
+        specialization: formData.get("specialization"),
         address: formData.get("address"),
         locationUrl: formData.get("locationUrl"),
         website: formData.get("website"),
@@ -172,6 +189,12 @@ export async function createVenue(prevState: any, formData: FormData) {
         eventTypes: eventTypes,
         venueTypeId: formData.get("venueTypeId") ? parseInt(formData.get("venueTypeId") as string) : undefined,
         attributes: attributes,
+        hasDanceFloor: formData.get("hasDanceFloor") === "on",
+        wheelchairAccessible: formData.get("wheelchairAccessible") === "on",
+        hasGlutenFreeOptions: formData.get("hasGlutenFreeOptions") === "on",
+        hasSugarFreeOptions: formData.get("hasSugarFreeOptions") === "on",
+        hasSaltFreeOptions: formData.get("hasSaltFreeOptions") === "on",
+        hasBabyChairs: formData.get("hasBabyChairs") === "on",
         media: mediaItems
     };
 
@@ -193,6 +216,8 @@ export async function createVenue(prevState: any, formData: FormData) {
                 description: data.description || "",
                 city: data.city,
                 category: data.category,
+                subcategory: data.subcategory || null,
+                specialization: data.specialization || null,
                 venueTypeId: data.venueTypeId, // Save ID
                 address: data.address || "",
                 locationUrl: data.locationUrl || null,
@@ -201,11 +226,19 @@ export async function createVenue(prevState: any, formData: FormData) {
                 reservationsEnabled: data.reservationsEnabled ?? true,
                 ambiance: data.ambiance || null,
                 cuisine: data.cuisine || null,
-                musicStyle: data.musicStyle || null,
                 openingHours: data.openingHours || null,
+                openingDays: data.openingDays || [],
+                startHour: data.startHour || null,
+                endHour: data.endHour || null,
                 startDate: data.startDate ? new Date(data.startDate) : null,
                 endDate: data.endDate ? new Date(data.endDate) : null,
                 weeklySchedule: data.weeklySchedule ?? undefined,
+                isWheelchairAccessible: data.wheelchairAccessible ?? false,
+                hasDanceFloor: data.hasDanceFloor ?? false,
+                hasGlutenFreeOptions: data.hasGlutenFreeOptions ?? false,
+                hasSugarFreeOptions: data.hasSugarFreeOptions ?? false,
+                hasSaltFreeOptions: data.hasSaltFreeOptions ?? false,
+                hasBabyChairs: data.hasBabyChairs ?? false,
                 // eventTypes: data.eventTypes ?? [],
                 ownerId: userId,
                 status: "PENDING", // Default status

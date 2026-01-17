@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, MapPin, Globe, Phone, Share, Heart, X, ChevronLeft, ChevronRight, Play, FileText, Edit, Trash2, Star, User } from "lucide-react";
+import { ArrowLeft, MapPin, Globe, Phone, Share, Heart, X, ChevronLeft, ChevronRight, Play, FileText, Edit, Trash2, Star, User, Calendar } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { deleteVenue } from "@/actions/venue";
 

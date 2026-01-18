@@ -21,6 +21,7 @@ function LoginPageContent() {
 
   const verified = sp.get("verified");
   const loggedout = sp.get("loggedout");
+  const callbackUrl = sp.get("callbackUrl");
   const blockAutoRedirect = useMemo(() => loggedout === "1", [loggedout]);
 
   useEffect(() => {
@@ -34,13 +35,16 @@ function LoginPageContent() {
   useEffect(() => {
     if (blockAutoRedirect) return;
     if (sessionStatus === "authenticated") {
-      if (role === "BUSINESS") {
+      // If there's a callbackUrl, redirect there
+      if (callbackUrl) {
+        router.replace(callbackUrl);
+      } else if (role === "BUSINESS") {
         router.replace("/business/dashboard");
       } else {
         router.replace("/dashboard");
       }
     }
-  }, [sessionStatus, router, blockAutoRedirect, role]);
+  }, [sessionStatus, router, blockAutoRedirect, role, callbackUrl]);
 
   useEffect(() => {
     if (error) setError(null);
@@ -72,7 +76,11 @@ function LoginPageContent() {
     // Elaboration of the redirect logic after login
     // The session might not be updated immediately here, but res.url is available
     // However, since we have redirect: false, we can use our router. push
-    router.push(role === "BUSINESS" ? "/business/dashboard" : "/dashboard");
+    if (callbackUrl) {
+      router.push(callbackUrl);
+    } else {
+      router.push(role === "BUSINESS" ? "/business/dashboard" : "/dashboard");
+    }
   }
 
   // ✅ On affiche l'écran "Redirection..." uniquement si on n'a PAS loggedout=1

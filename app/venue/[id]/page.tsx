@@ -36,7 +36,7 @@ export default function VenueDetailPage() {
 
   async function createReservation() {
     if (!session) {
-      router.push("/login"); // Auth Check
+      router.push(`/login?callbackUrl=${encodeURIComponent(`/venue/${id}`)}`); // Auth Check
       return;
     }
 
@@ -426,7 +426,7 @@ export default function VenueDetailPage() {
                     </button>
                   ) : (
                     <button
-                      onClick={() => router.push("/login")}
+                      onClick={() => router.push(`/login?callbackUrl=${encodeURIComponent(`/venue/${id}`)}`)}
                       className="w-full rounded-xl bg-white text-black font-bold py-3.5 hover:bg-zinc-200 transition-colors"
                     >
                       Log in to Reserve

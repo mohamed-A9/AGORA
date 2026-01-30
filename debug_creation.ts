@@ -23,8 +23,8 @@ async function debugCreation() {
                 mainCategory: "NIGHTLIFE_BARS",
                 status: "DRAFT",
                 ownerId: user.id, // Explicitly linking to user
-                wizardStep: 1,
-                city: { connect: { name: "Casablanca" } } // Try connecting city too
+                // wizardStep: 1,
+                // city: { connect: { name: "Casablanca" } } // Try connecting city too
             }
         });
         console.log("✅ Success! Created venue:", venue.id);

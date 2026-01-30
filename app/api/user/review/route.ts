@@ -25,7 +25,7 @@ export async function POST(req: Request) {
         // 1. Verify User has checked-in to this venue
         const checkin = await prisma.reservation.findFirst({
             where: {
-                userId,
+                email: session.user.email || "", // Check by email as Reservation has no userId
                 venueId,
                 status: "CHECKED_IN",
             },

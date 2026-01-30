@@ -39,7 +39,7 @@ export async function GET(req: Request) {
       owner: {
         select: { id: true, email: true, phone: true, name: true, role: true },
       },
-      media: true
+      gallery: true
     },
   });
 

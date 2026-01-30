@@ -17,12 +17,15 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
-      dateTime: true,
+      date: true,
+      time: true,
       status: true,
-      qrToken: true,
+
       createdAt: true,
-      user: { select: { id: true, name: true, email: true, phone: true } }, // ✅ phone
-      venue: { select: { id: true, name: true, city: true, category: true } },
+      name: true,
+      email: true,
+      phone: true,
+      venue: { select: { id: true, name: true, city: true, mainCategory: true } },
     },
     take: 150,
   });

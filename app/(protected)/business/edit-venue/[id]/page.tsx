@@ -155,7 +155,7 @@ export default function EditVenuePage() {
             return;
         }
 
-        getVenueTypeFields(selectedSubcategory).then(fields => {
+        getVenueTypeFields(selectedSubcategory).then((fields: any[]) => {
             setDynamicFields(fields); // Store all fields for other tabs
 
             const specFieldKey = ['activity_type', 'cuisine_types', 'music_genres', 'ambiance'].find(key =>

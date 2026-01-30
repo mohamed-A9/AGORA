@@ -46,51 +46,51 @@ export async function GET(request: Request) {
       { name: { contains: q, mode: "insensitive" } },
       { description: { contains: q, mode: "insensitive" } },
       { address: { contains: q, mode: "insensitive" } },
-      { tagline: { contains: q, mode: "insensitive" } },
+      // { tagline: { contains: q, mode: "insensitive" } }, // Missing in schema
     ];
   }
 
   // 2. Multi-Match Filters (Support for preferences)
-  if (city) {
-    const cities = city.split(",").filter(Boolean);
-    where.city = cities.length > 1 ? { in: cities } : cities[0];
-  }
+  // if (city) {
+  //   const cities = city.split(",").filter(Boolean);
+  //   where.city = cities.length > 1 ? { in: cities } : cities[0];
+  // }
   if (category) {
     const categories = category.split(",").filter(Boolean);
-    where.category = categories.length > 1 ? { in: categories } : categories[0];
+    where.mainCategory = categories.length > 1 ? { in: categories as any[] } : (categories[0] as any);
   }
-  if (ambiance) {
-    const ambiances = ambiance.split(",").filter(Boolean);
-    where.ambiance = ambiances.length > 1 ? { in: ambiances } : ambiances[0];
-  }
-  if (cuisine) where.cuisine = cuisine;
+  // if (ambiance) {
+  //   const ambiances = ambiance.split(",").filter(Boolean);
+  //   where.ambiance = ambiances.length > 1 ? { in: ambiances } : ambiances[0];
+  // }
+  // if (cuisine) where.cuisine = cuisine;
 
   // 3. Features
-  if (parkingAvailable) where.parkingAvailable = true;
-  if (valetParking) where.valetParking = true;
+  // if (parkingAvailable) where.parkingAvailable = true; // Use VenueFacility relation
+  // if (valetParking) where.valetParking = true;
   if (reservationsEnabled) where.reservationsEnabled = true;
 
   // 4. Array Filters
-  if (dressCodes && dressCodes.length > 0) {
-    where.dressCode = { in: dressCodes };
-  }
-  if (agePolicies && agePolicies.length > 0) {
-    where.agePolicy = { in: agePolicies };
-  }
-  if (paymentMethods && paymentMethods.length > 0) {
-    where.paymentMethods = { hasSome: paymentMethods };
-  }
+  // if (dressCodes && dressCodes.length > 0) {
+  //   where.dressCode = { in: dressCodes };
+  // }
+  // if (agePolicies && agePolicies.length > 0) {
+  //   where.agePolicy = { in: agePolicies };
+  // }
+  // if (paymentMethods && paymentMethods.length > 0) {
+  //   where.paymentMethods = { hasSome: paymentMethods };
+  // }
 
   // 4a. Opening Hours/Days
-  if (startHour) {
-    where.startHour = { lte: startHour }; // Venue must open before or at requested time
-  }
-  if (endHour) {
-    where.endHour = { gte: endHour }; // Venue must close after or at requested time
-  }
-  if (openingDays && openingDays.length > 0) {
-    where.openingDays = { hasSome: openingDays };
-  }
+  // if (startHour) {
+  //   where.startHour = { lte: startHour }; // Venue must open before or at requested time
+  // }
+  // if (endHour) {
+  //   where.endHour = { gte: endHour }; // Venue must close after or at requested time
+  // }
+  // if (openingDays && openingDays.length > 0) {
+  //   where.openingDays = { hasSome: openingDays };
+  // }
 
   // 5. Event Filters (Filtering Venues by their Events)
   if (eventType || eventGenre || date || startTime) {
@@ -127,7 +127,7 @@ export async function GET(request: Request) {
     where,
     orderBy,
     include: {
-      media: true,
+      gallery: true,
       events: {
         where: date ? {
           date: {

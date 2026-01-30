@@ -7,6 +7,12 @@ export const metadata: Metadata = {
 };
 
 
+import { Suspense } from "react";
+
 export default function AddVenuePage() {
-    return <EditableVenuePage />;
+    return (
+        <Suspense fallback={<div className="text-white text-center py-20">Loading...</div>}>
+            <EditableVenuePage />
+        </Suspense>
+    );
 }

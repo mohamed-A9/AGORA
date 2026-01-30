@@ -35,9 +35,20 @@ export async function POST(req: Request) {
     return json(403, { error: "VENUE_NOT_APPROVED", status: venue.status });
   }
 
-  // ✅ Optionnel: empêcher la même réservation (même user, même venue, même datetime)
+  // ✅ Optionnel: empêcher la même réservation (même user, même venue, même date)
+  // Converting dateTime to date object and time string
+  const dateObj = new Date(dateTime);
+  const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Use email from token to identify user uniqueness for reservation
+  const userEmail = token.email || "";
+
   const existing = await prisma.reservation.findFirst({
-    where: { venueId, userId, dateTime },
+    where: {
+      venueId,
+      email: userEmail,
+      date: dateObj
+    },
     select: { id: true, status: true },
   });
 
@@ -45,25 +56,24 @@ export async function POST(req: Request) {
     return json(409, { error: "ALREADY_RESERVED", reservationId: existing.id, status: existing.status });
   }
 
-  // ✅ QR token unique + sécurisé
-  // (On génère une string random longue, impossible à deviner)
-  const qrToken = crypto.randomBytes(32).toString("hex");
-
+  // ✅ Create Reservation matching schema
   const reservation = await prisma.reservation.create({
     data: {
       venueId,
-      userId,
-      dateTime,
+      date: dateObj,
+      time: timeStr,
+      partySize: Number(body?.partySize) || 2,
+      name: token.name || "Unknown",
+      email: userEmail,
+      phone: (token as any).phone || "",
       status: "PENDING",
-      qrToken,
     },
     select: {
       id: true,
       venueId: true,
-      userId: true,
-      dateTime: true,
+      date: true,
+      time: true,
       status: true,
-      qrToken: true,
       createdAt: true,
     },
   });

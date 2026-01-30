@@ -19,7 +19,7 @@ export async function GET(req: Request) {
       id: true,
       name: true,
       city: true,
-      category: true,
+      mainCategory: true,
       address: true,
       description: true,
       status: true,
@@ -55,14 +55,14 @@ export async function POST(req: Request) {
   const venue = await prisma.venue.create({
     data: {
       name,
-      city,
-      category: category || "",
+      mainCategory: category as any,
+      // city: city, // City is a relation, needs ID or connect
       address: address || "",
+      slug: name.toLowerCase().replace(/ /g, "-") + "-" + Date.now(),
       description,
       ownerId,
       status: "PENDING",
-      approvedAt: null,
-      approvedBy: null,
+
     },
     select: { id: true },
   });

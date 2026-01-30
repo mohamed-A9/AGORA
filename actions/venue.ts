@@ -1,75 +1,508 @@
 "use server";
 
+import fs from 'fs';
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { sanitizeVenueData, sanitizeString } from "@/lib/sanitize";
 
-export async function createVenueDraft(prevState: any, formData: FormData) {
+
+export async function getVenueDraft(venueId: string) {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) return { error: "Unauthorized" };
 
-    const name = formData.get("name") as string;
-    const category = formData.get("category") as string;
-    const subcategory = formData.get("subcategory") as string;
-    const specialization = formData.get("specialization") as string;
-    const tagline = formData.get("tagline") as string;
-    const description = formData.get("description") as string;
+    const userId = (session.user as any).id;
 
-    if (!name || !category) {
-        return { error: "Name and Category are required." };
+    // Check if user owns venue (or is admin)
+    const venue = await prisma.venue.findFirst({
+        where: { id: venueId },
+        include: {
+            city: true,
+            cuisines: { include: { cuisine: true } },
+            vibes: { include: { vibe: true } },
+            musicTypes: { include: { musicType: true } },
+            facilities: { include: { facility: true } },
+            subcategories: { include: { subcategory: true } },
+            gallery: { orderBy: { sortOrder: 'asc' } }
+        }
+    });
+
+    if (!venue) return { error: "Venue not found" };
+
+    // Simple authorization check
+    // We fetch role to be sure
+    const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (venue.ownerId !== userId && dbUser?.role !== "ADMIN") {
+        return { error: "Unauthorized access to this venue" };
     }
 
+    return { venue };
+}
+
+export async function createVenueDraft(prevState: any, formData: FormData) {
+    const logFile = 'venue_creation_log.txt';
+    const timestamp = new Date().toISOString();
+
     try {
+        const session = await getServerSession(authOptions);
+        // Sanitize user input immediately
+        const name = sanitizeString(formData.get("name") as string);
+        const category = formData.get("category") as string; // Category is from predefined list
+        const description = sanitizeString(formData.get("description") as string);
+
+        fs.appendFileSync(logFile, `\n[${timestamp}] Attempt: Name="${name}", Cat="${category}"\n`);
+
+        if (!session || !session.user) {
+            fs.appendFileSync(logFile, `[${timestamp}] FAILED: Unauthorized (No Session)\n`);
+            return { error: "Unauthorized" };
+        }
+
+        const userId = (session.user as any).id as string;
+        fs.appendFileSync(logFile, `[${timestamp}] UserID: ${userId}\n`);
+
+        if (!userId) {
+            fs.appendFileSync(logFile, `[${timestamp}] FAILED: User ID missing in session\n`);
+            return { error: "Authentication Error: User ID missing. Please log out and log in again." };
+        }
+
+        // ... rest of function
+
+
+        // 1. CHECK FOR EXISTING DRAFT (Dup Check)
+        fs.appendFileSync(logFile, `[${timestamp}] Checking DB for existing draft... (Owner=${userId}, Name=${name})\n`);
+        const existingDraft = await prisma.venue.findFirst({
+            where: {
+                ownerId: userId,
+                name: name,
+                status: "DRAFT"
+            },
+            select: { id: true, name: true }
+        });
+        fs.appendFileSync(logFile, `[${timestamp}] DB Check Result: ${existingDraft ? existingDraft.id : "None"}\n`);
+
+        if (existingDraft) {
+            console.log(`✅ Found existing draft for "${name}" (${existingDraft.id}). Resuming...`);
+            return { success: true, venueId: existingDraft.id, isExisting: true };
+        }
+
+        // 2. PREPARE DATA FOR CREATION
+        console.log(`🔧 Creating NEW draft for "${name}"...`);
+
+        // Safer Slug Generation
+        // Handle Arabic or special chars by fallback to random if empty
+        let safeSlugBase = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        if (safeSlugBase.length < 2) safeSlugBase = "venue";
+        const slug = `${safeSlugBase}-${Math.floor(Math.random() * 100000)}`;
+
+        // Proper Category Handling
+        // Input is likely "NIGHTLIFE_BARS" or "Nightlife & Bars"
+        let mainCategoryInput = category.trim();
+        // Try exact match first (if it's already an enum key)
+        // If not, try to transform Label -> Enum
+        if (mainCategoryInput === "Nightlife & Bars") mainCategoryInput = "NIGHTLIFE_BARS";
+        else if (mainCategoryInput === "Clubs & Party") mainCategoryInput = "CLUBS_PARTY";
+        else if (mainCategoryInput === "Activities & Fun") mainCategoryInput = "ACTIVITIES_FUN";
+        else if (mainCategoryInput === "Wellness & Health") mainCategoryInput = "WELLNESS_HEALTH";
+
+        // Final sanitization for Enum
+        // transform "Nightlife & Bars" -> "NIGHTLIFE_&_BARS" (Invalid) -> Correct to "NIGHTLIFE_BARS" if needed
+        let mainCategory = mainCategoryInput.toUpperCase().replace(/\s+/g, "_");
+
+        // Specific Fixes for Prisma Enum Mismatches
+        if (mainCategory === "NIGHTLIFE_&_BARS") mainCategory = "NIGHTLIFE_BARS";
+        if (mainCategory === "CLUBS_&_PARTY") mainCategory = "CLUBS_PARTY";
+        if (mainCategory === "ACTIVITIES_&_FUN") mainCategory = "ACTIVITIES_FUN";
+        if (mainCategory === "WELLNESS_&_HEALTH") mainCategory = "WELLNESS_HEALTH";
+
+        fs.appendFileSync(logFile, `[${timestamp}] About to create venue with Cat: ${mainCategory}, Slug: ${slug}\n`);
+
         const venue = await prisma.venue.create({
             data: {
                 name,
-                category,
-                subcategory,
-                specialization,
-                tagline,
-                description,
-                city: "Pending",
-                address: "",
-                ownerId: (session.user as any).id as string,
-                status: "DRAFT"
+                slug,
+                mainCategory: mainCategory as any,
+                description: description || "",
+                ownerId: userId,
+                status: "DRAFT",
+                wizardStep: 1,
+                isVerified: false,
+                isActive: false
             }
         });
+
+        console.log("✅ New Draft Created:", venue.id);
+        fs.appendFileSync(logFile, `[${timestamp}] ✅ SUCCESS: Created ID ${venue.id}\n`);
         return { success: true, venueId: venue.id };
+
     } catch (e: any) {
-        console.error("Draft Error", e);
-        return { error: `Failed to create draft: ${e.message}` };
+        fs.appendFileSync(logFile, `[${timestamp}] ❌ ERROR: ${e.message}\n`);
+        console.error("❌ Draft Creation Failed:", e);
+        // Return clear error message to frontend
+        return { error: `Creation failed: ${e.message}` };
     }
 }
 
 export async function updateVenueStep(venueId: string, data: any) {
+    const logFile = 'venue_update_log.txt';
+    const timestamp = new Date().toISOString();
+    fs.appendFileSync(logFile, `\n[${timestamp}] START Update: ID=${venueId}\n`);
+
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) return { error: "Unauthorized" };
+    if (!session || !session.user) {
+        fs.appendFileSync(logFile, `[${timestamp}] FAIL: Unauthorized\n`);
+        return {
+            error: "UNAUTHORIZED",
+            message: "You must be logged in",
+            statusCode: 401
+        };
+    }
 
     try {
         const userId = (session.user as any).id as string;
+        const userRole = (session.user as any).role;
 
-        // Fetch fresh user to ensure Admin role is respected even if session is stale
-        const dbUser = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { role: true }
+        // ============================================
+        // PRE-FLIGHT CHECK: Verify venue exists
+        // ============================================
+        console.log(`🔍 [updateVenueStep] Checking if venue exists: ${venueId}`);
+
+        const existingVenue = await prisma.venue.findUnique({
+            where: { id: venueId },
+            select: { id: true, ownerId: true, name: true }
         });
-        const role = dbUser?.role || "USER";
 
-        const whereClause = role === "ADMIN"
-            ? { id: venueId }
-            : { id: venueId, ownerId: userId };
+        if (!existingVenue) {
+            fs.appendFileSync(logFile, `[${timestamp}] FAIL: Venue not found\n`);
+            console.log(`❌ Venue not found in database: ${venueId}`);
+            return {
+                error: "VENUE_NOT_FOUND",
+                message: "This venue draft no longer exists",
+                statusCode: 404
+            };
+        }
 
-        await prisma.venue.update({
-            where: whereClause,
-            data: data
+        console.log(`📦 Venue found: ${existingVenue.name} (owner: ${existingVenue.ownerId})`);
+        fs.appendFileSync(logFile, `[${timestamp}] Venue Found: ${existingVenue.name}\n`);
+
+
+        // ============================================
+        // OWNERSHIP CHECK (unless admin)
+        // ============================================
+        if (userRole !== "ADMIN" && existingVenue.ownerId !== userId) {
+            console.log(`❌ Permission denied. User ${userId} is not owner of venue ${venueId}`);
+            return {
+                error: "NOT_OWNER",
+                message: "You don't have permission to edit this venue",
+                statusCode: 403
+            };
+        }
+
+        console.log(`✅ Ownership verified. Proceeding with update...`);
+
+        // ============================================
+        // SANITIZE ALL INPUT DATA (Security)
+        // ============================================
+        const sanitizedData = sanitizeVenueData(data);
+
+        // Prepare data for Prisma
+        const updateData = { ...sanitizedData };
+        delete updateData.tagline; // Not in schema
+
+        // Extract wizardStep if provided (to track progress)
+        const wizardStep = updateData.wizardStep;
+        if (wizardStep !== undefined) {
+            delete updateData.wizardStep; // Will be set separately
+        }
+
+        // Handle City Relation
+        if (updateData.city) {
+            const citySlug = updateData.city.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            updateData.city = {
+                connectOrCreate: {
+                    where: { name: updateData.city },
+                    create: {
+                        name: updateData.city,
+                        slug: citySlug,
+                        country: "Morocco"
+                    }
+                }
+            };
+        }
+
+        // Category handling...
+        if (updateData.category) {
+            updateData.mainCategory = updateData.category.toUpperCase().replace(" ", "_");
+            delete updateData.category;
+        }
+
+        // Handle subcategory relation
+        // Handle subcategory relation
+        if (updateData.subcategory !== undefined) {
+            // First, clear existing subcategories
+            // separate query to avoid complexity in the main update
+            await prisma.venueSubcategory.deleteMany({
+                where: { venueId: venueId }
+            });
+
+            if (updateData.subcategory && typeof updateData.subcategory === "string") {
+                const subName = updateData.subcategory;
+                const subSlug = subName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+                // Get Main Category
+                let mainCategory = updateData.mainCategory;
+                if (!mainCategory) {
+                    const existingVenue = await prisma.venue.findUnique({
+                        where: { id: venueId },
+                        select: { mainCategory: true }
+                    });
+                    mainCategory = existingVenue?.mainCategory;
+                }
+
+                if (mainCategory) {
+                    // Find or Create Subcategory independently
+                    const subParams = {
+                        name: subName,
+                        slug: subSlug,
+                        mainCategory: mainCategory
+                    };
+
+                    const subCat = await prisma.subcategory.upsert({
+                        where: { slug: subSlug },
+                        update: subParams,
+                        create: subParams
+                    });
+
+                    // We will create the relation separately or add to update
+                    // but since we are inside 'updateVenueStep', let's just do it here to ensure it works
+                    await prisma.venueSubcategory.create({
+                        data: {
+                            venueId: venueId,
+                            subcategoryId: subCat.id
+                        }
+                    });
+                }
+            }
+            // Remove from main update payload to avoid conflict
+            delete updateData.subcategories;
+            delete updateData.subcategory;
+        }
+
+        // Handle Cuisines (Array/String)
+        if (updateData.cuisines || updateData.cuisine) {
+            const input = updateData.cuisines || updateData.cuisine;
+            const rawItems = Array.isArray(input) ? input : (input ? [input] : []);
+            const items = Array.from(new Set(rawItems)); // Deduplicate
+
+            updateData.cuisines = {
+                deleteMany: {},
+                create: items.map((name: string) => ({
+                    cuisine: {
+                        connectOrCreate: {
+                            where: { slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') },
+                            create: { name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') }
+                        }
+                    }
+                }))
+            };
+            delete updateData.cuisine;
+        }
+
+        // Handle Vibes (Array/String)
+        if (updateData.vibes || updateData.ambiance) {
+            const input = updateData.vibes || updateData.ambiance;
+            const rawItems = Array.isArray(input) ? input : (input ? [input] : []);
+            const items = Array.from(new Set(rawItems)); // Deduplicate
+
+            updateData.vibes = {
+                deleteMany: {},
+                create: items.map((name: string) => ({
+                    vibe: {
+                        connectOrCreate: {
+                            where: { slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') },
+                            create: { name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') }
+                        }
+                    }
+                }))
+            };
+            delete updateData.ambiance;
+        }
+
+        // Handle Facilities (Array)
+        if (updateData.facilities) {
+            const rawItems = Array.isArray(updateData.facilities) ? updateData.facilities : [updateData.facilities];
+            const items = Array.from(new Set(rawItems)); // Deduplicate
+
+            updateData.facilities = {
+                deleteMany: {},
+                create: items.map((code: string) => ({
+                    facility: {
+                        connectOrCreate: {
+                            where: { code: code },
+                            create: { code: code, label: code.replace(/_/g, ' ') }
+                        }
+                    }
+                }))
+            };
+        }
+
+        // Handle Music (Array)
+        if (updateData.music) {
+            const rawItems = Array.isArray(updateData.music) ? updateData.music : [updateData.music];
+            const items = Array.from(new Set(rawItems)); // Deduplicate
+
+            updateData.musicTypes = {
+                deleteMany: {},
+                create: items.map((name: string) => ({
+                    musicType: {
+                        connectOrCreate: {
+                            where: { slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') },
+                            create: { name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') }
+                        }
+                    }
+                }))
+            };
+            delete updateData.music;
+        }
+
+        // Handle media/gallery and menus
+        // We construct a single update operation for the 'gallery' relation
+        const galleryUpdate: any = {};
+        const mediaCreates: any[] = [];
+        const menuCreates: any[] = [];
+        const deleteConditions: any[] = [];
+
+        // 1. Handle Gallery Media (Images/Videos)
+        if (updateData.media !== undefined) {
+            // We are updating the main gallery.
+            // Mark existing gallery items (image/video) for deletion
+            deleteConditions.push({ kind: { in: ['image', 'video'] } });
+
+            if (Array.isArray(updateData.media) && updateData.media.length > 0) {
+                updateData.media.forEach((m: any, idx: number) => {
+                    mediaCreates.push({
+                        url: m.url,
+                        kind: m.type, // 'image' or 'video'
+                        sortOrder: idx
+                    });
+                });
+            }
+            delete updateData.media;
+        }
+
+        // 2. Handle Menu Items (Menu Images/PDFs)
+        if (updateData.menus !== undefined) {
+            // We are updating the menus.
+            // Mark existing menu items for deletion
+            deleteConditions.push({ kind: { in: ['menu_image', 'menu_pdf'] } });
+
+            if (Array.isArray(updateData.menus) && updateData.menus.length > 0) {
+                updateData.menus.forEach((m: any, idx: number) => {
+                    // Map type to menu_kind
+                    // Frontend sends 'image' or 'pdf'. We map to 'menu_image' or 'menu_pdf'
+                    let kind = 'menu_image';
+                    if (m.type === 'pdf') kind = 'menu_pdf';
+                    else if (m.type === 'image') kind = 'menu_image';
+
+                    menuCreates.push({
+                        url: m.url,
+                        kind: kind,
+                        sortOrder: idx
+                    });
+                });
+            }
+            delete updateData.menus;
+        }
+
+        // Apply if any updates needed
+        if (deleteConditions.length > 0) {
+            updateData.gallery = {
+                deleteMany: {
+                    OR: deleteConditions
+                },
+                create: [...mediaCreates, ...menuCreates]
+            };
+        }
+
+        // Create structured weeklySchedule for persistence
+        if (data.startHour || data.endHour || data.openingDays) {
+            updateData.weeklySchedule = {
+                startHour: data.startHour,
+                endHour: data.endHour,
+                openingDays: data.openingDays,
+                // Add inferred dayStart/dayEnd for easier frontend hydration if useful
+                dayStart: data.openingDays && data.openingDays.length > 0 ? data.openingDays[0] : undefined,
+                dayEnd: data.openingDays && data.openingDays.length > 0 ? data.openingDays[data.openingDays.length - 1] : undefined
+            };
+        }
+
+        // Handle Reservation Policy Logic
+        if (updateData.reservationPolicy) {
+            const policy = updateData.reservationPolicy;
+            // Sync legacy boolean
+            updateData.reservationsEnabled = (policy !== "WALK_IN_ONLY" && policy !== "NO_RESERVATION");
+            // Note: Enum in DB is WALK_IN_ONLY, but guarding against potential frontend string mismatch if any
+        }
+
+        // Cleanup UI-only fields that are not in Schema
+        delete updateData.phonePrefix;
+        delete updateData.timeStart;
+        delete updateData.timeEnd;
+        delete updateData.dayStart;
+        delete updateData.dayEnd;
+        delete updateData.instagram; // Mapped to instagramUrl
+        delete updateData.menuUrl; // Temporary fix until client generation works
+        delete updateData.startHour;
+        delete updateData.endHour;
+        delete updateData.openingDays;
+
+        // Cleanup Protected Fields
+        delete updateData.id;
+        delete updateData.ownerId;
+        delete updateData.createdAt;
+        delete updateData.updatedAt;
+
+        // ============================================
+        // UPDATE VENUE (ownership already verified in pre-flight check)
+        // ============================================
+        console.log("💾 Updating venue in database...");
+        fs.appendFileSync(logFile, `[${timestamp}] Ready to Update DB...\n`);
+
+        const updatedVenue = await prisma.venue.update({
+            where: { id: venueId }, // Ownership already verified above
+            data: {
+                ...updateData,
+                ...(wizardStep !== undefined && { wizardStep })
+            }
         });
+
+        console.log("✅ Venue updated successfully:", updatedVenue.id);
+
+        revalidatePath("/business/my-venues");
+        revalidatePath("/business/dashboard");
+        revalidatePath("/dashboard");
+
         return { success: true };
     } catch (e: any) {
-        console.error("Update Step Error:", e);
-        return { error: `Update failed: ${e.message}` };
+        console.error("❌ Update Step Error:", e);
+
+        // Handle specific error: venue not found (shouldn't happen with pre-flight check)
+        if (e.code === 'P2025') {
+            console.error("❌ P2025 Error - Venue not found:", venueId);
+            return {
+                error: "VENUE_NOT_FOUND",
+                message: "This venue draft no longer exists",
+                statusCode: 404
+            };
+        }
+
+        return {
+            error: "UPDATE_FAILED",
+            message: e.message || "Failed to update venue",
+            statusCode: 500
+        };
     }
 }
 
@@ -82,7 +515,12 @@ const VenueSchema = z.object({
     specialization: z.string().optional(),
     address: z.string().optional(),
     locationUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+    wazeUrl: z.string().optional(),
+    instagramUrl: z.string().optional(),
+    tiktokUrl: z.string().optional(),
     website: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+    menuUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+    email: z.string().email("Invalid email address").optional().or(z.literal("")),
     phone: z.string().optional(),
     reservationsEnabled: z.boolean().optional(),
     ambiance: z.string().optional(),
@@ -117,7 +555,7 @@ export async function createVenue(prevState: any, formData: FormData) {
         return { error: "Unauthorized" };
     }
 
-    // @ts-ignore - session.user.role is typed as any in auth.ts
+    // @ts-ignore
     const role = session.user.role;
     // @ts-ignore
     const userId = (session.user as any).id;
@@ -137,133 +575,103 @@ export async function createVenue(prevState: any, formData: FormData) {
         return { error: "Invalid media data" };
     }
 
-    // Parse Weekly Schedule and Event Types
-    let weeklySchedule = undefined;
-    try {
-        const ws = formData.get("weeklySchedule") as string;
-        if (ws) weeklySchedule = JSON.parse(ws);
-    } catch (e) { }
+    // Simple Slugify
+    const name = formData.get("name") as string;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + "-" + Math.floor(Math.random() * 10000);
 
-    let eventTypes: string[] = [];
-    try {
-        const et = formData.get("eventTypes") as string;
-        if (et) eventTypes = JSON.parse(et);
-    } catch (e) { }
+    // Prepare Facilities
+    const facilitiesToConnect = [];
+    if (formData.get("wheelchairAccessible") === "on") facilitiesToConnect.push("DISABLED_ACCESS");
+    if (formData.get("hasBabyChairs") === "on") facilitiesToConnect.push("BABY_CHAIR");
+    // Add others if mapped in constants
 
-
-    let attributes = {};
-    try {
-        const attr = formData.get("attributesJson") as string;
-        if (attr) attributes = JSON.parse(attr);
-    } catch (e) { }
-
-
-    // Combine Opening Hours if provided separately
-    let openingHours = formData.get("openingHours") as string;
-    const opensAt = formData.get("opensAt") as string;
-    const closesAt = formData.get("closesAt") as string;
-
-    if (!openingHours && opensAt && closesAt) {
-        openingHours = `${opensAt} - ${closesAt}`;
+    // Prepare Policies
+    const policiesToConnect = [];
+    if (formData.get("hasDanceFloor") === "on") {
+        // Maybe dance floor is a facility or vibe? For now, let's skip/comment or assume it's a Tag? 
+        // Schema doesn't have DANCE_FLOOR in Enum? Let's check. 
+        // Assuming it's ok to skip strict mapping for now or map to a Tag if needed.
     }
 
-    const rawData = {
-        name: formData.get("name"),
-        description: formData.get("description"),
-        city: formData.get("city"),
-        category: formData.get("category"),
-        subcategory: formData.get("subcategory"),
-        specialization: formData.get("specialization"),
-        address: formData.get("address"),
-        locationUrl: formData.get("locationUrl"),
-        website: formData.get("website"),
-        phone: formData.get("phone"),
-        reservationsEnabled: formData.get("reservationsEnabled") === "on",
-        ambiance: formData.get("ambiance"),
-        cuisine: formData.get("cuisine"),
-        musicStyle: formData.get("musicStyle"),
-        openingHours: openingHours,
-        startDate: formData.get("startDate"),
-        endDate: formData.get("endDate"),
-        weeklySchedule: weeklySchedule,
-        eventTypes: eventTypes,
-        venueTypeId: formData.get("venueTypeId") ? parseInt(formData.get("venueTypeId") as string) : undefined,
-        attributes: attributes,
-        hasDanceFloor: formData.get("hasDanceFloor") === "on",
-        wheelchairAccessible: formData.get("wheelchairAccessible") === "on",
-        hasGlutenFreeOptions: formData.get("hasGlutenFreeOptions") === "on",
-        hasSugarFreeOptions: formData.get("hasSugarFreeOptions") === "on",
-        hasSaltFreeOptions: formData.get("hasSaltFreeOptions") === "on",
-        hasBabyChairs: formData.get("hasBabyChairs") === "on",
-        media: mediaItems
-    };
+    const rawCategory = formData.get("category") as string;
+    // Ensure category matches Enum Uppercase
+    const mainCategory = rawCategory.toUpperCase().replace(" ", "_"); // e.g. "Nightlife & Bars" -> "NIGHTLIFE_&_BARS" (Need to match exact ENUM)
+    // Actually our TAXONOMY.CATEGORIES values are correct (e.g. "NIGHTLIFE_BARS"). 
+    // We trust the form sends the Value, not the Label.
 
-    const validated = VenueSchema.safeParse(rawData);
-
-    if (!validated.success) {
-        return {
-            error: "Validation failed",
-            fieldErrors: validated.error.flatten().fieldErrors
-        };
-    }
-
-    const data = validated.data;
+    const city = formData.get("city") as string;
+    const subcategorySlug = (formData.get("subcategory") as string)?.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const cuisineSlug = (formData.get("cuisine") as string)?.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const vibeSlug = (formData.get("ambiance") as string)?.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     try {
         const newVenue = await prisma.venue.create({
             data: {
-                name: data.name,
-                description: data.description || "",
-                city: data.city,
-                category: data.category,
-                subcategory: data.subcategory || null,
-                specialization: data.specialization || null,
-                venueTypeId: data.venueTypeId, // Save ID
-                address: data.address || "",
-                locationUrl: data.locationUrl || null,
-                website: data.website || null,
-                phone: data.phone || null,
-                reservationsEnabled: data.reservationsEnabled ?? true,
-                ambiance: data.ambiance || null,
-                cuisine: data.cuisine || null,
-                openingHours: data.openingHours || null,
-                openingDays: data.openingDays || [],
-                startHour: data.startHour || null,
-                endHour: data.endHour || null,
-                startDate: data.startDate ? new Date(data.startDate) : null,
-                endDate: data.endDate ? new Date(data.endDate) : null,
-                weeklySchedule: data.weeklySchedule ?? undefined,
-                isWheelchairAccessible: data.wheelchairAccessible ?? false,
-                hasDanceFloor: data.hasDanceFloor ?? false,
-                hasGlutenFreeOptions: data.hasGlutenFreeOptions ?? false,
-                hasSugarFreeOptions: data.hasSugarFreeOptions ?? false,
-                hasSaltFreeOptions: data.hasSaltFreeOptions ?? false,
-                hasBabyChairs: data.hasBabyChairs ?? false,
-                // eventTypes: data.eventTypes ?? [],
-                ownerId: userId,
-                status: "PENDING", // Default status
+                name,
+                // @ts-ignore
+                slug,
+                description: (formData.get("description") as string) || "",
+                mainCategory: mainCategory as any, // Cast to any or Enum if imported
 
-                // Save Dynamic Attributes
-                attributes: {
-                    create: Object.entries(data.attributes || {}).map(([key, value]) => ({
-                        field_key: key,
-                        value_json: value as any
+                // Location
+                city: { connect: { name: city } } as any, // Cast to any (Stale types)
+                address: (formData.get("address") as string) || "",
+                locationUrl: (formData.get("locationUrl") as string) || null,
+
+                // Contact
+                website: (formData.get("website") as string) || null,
+                phone: (formData.get("phone") as string) || null,
+
+                // Relations
+                // Connect subcategory if present
+                subcategories: subcategorySlug ? {
+                    create: {
+                        subcategory: {
+                            connect: { slug: subcategorySlug }
+                        }
+                    }
+                } : undefined,
+
+                // Connect cuisine if present
+                cuisines: cuisineSlug ? {
+                    create: {
+                        cuisine: { connect: { slug: cuisineSlug } }
+                    }
+                } : undefined,
+
+                // Connect vibe if present
+                vibes: vibeSlug ? {
+                    create: {
+                        vibe: { connect: { slug: vibeSlug } }
+                    }
+                } : undefined,
+
+                // Facilities
+                facilities: facilitiesToConnect.length > 0 ? {
+                    create: facilitiesToConnect.map(code => ({
+                        facility: { connect: { code } }
+                    }))
+                } : undefined,
+
+                // Media
+                gallery: {
+                    create: mediaItems.map((m: any, idx: number) => ({
+                        url: m.url,
+                        kind: m.type,
+                        sortOrder: idx
                     }))
                 },
 
-                media: {
-                    create: data.media?.map(m => ({
-                        url: m.url,
-                        type: m.type
-                    }))
-                }
+                // Meta
+                ownerId: userId,
+                status: "PENDING"
             }
         });
 
         revalidatePath("/business/dashboard");
-    } catch (error) {
+    } catch (error: any) {
         console.error("Venue creation error:", error);
-        return { error: "Failed to create venue in database." };
+        return { error: `Failed to create venue: ${error.message}` };
     }
 
     redirect("/business/dashboard");

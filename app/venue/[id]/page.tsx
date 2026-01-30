@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, MapPin, Globe, Phone, Share, Heart, X, ChevronLeft, ChevronRight, Play, FileText, Edit, Trash2, Star, User, Calendar } from "lucide-react";
+import { ArrowLeft, MapPin, Globe, Phone, Share, Heart, X, ChevronLeft, ChevronRight, Play, FileText, Edit, Trash2, Star, User, Calendar, Utensils } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { deleteVenue } from "@/actions/venue";
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
 export default function VenueDetailPage() {
   const params = useParams<{ id: string }>();
@@ -61,8 +62,10 @@ export default function VenueDetailPage() {
     setDateTime("");
   }
 
-  async function handleDelete() {
-    if (!confirm("Are you sure you want to delete this venue? This cannot be undone.")) return;
+  // Delete Modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  async function confirmDelete() {
     const res = await deleteVenue(venue.id);
     if (res?.success) {
       router.push("/business/dashboard");
@@ -75,8 +78,17 @@ export default function VenueDetailPage() {
   if (!venue) return <div className="min-h-screen flex items-center justify-center text-white/50">Venue not found.</div>;
 
   // Visual Media (Images + Videos) for Gallery
-  const visualMedia = venue.media?.filter((m: any) => m.type === 'image' || m.type === 'video') || [];
-  const pdfs = venue.media?.filter((m: any) => m.type === 'pdf') || [];
+  // API returns 'gallery' which is an array of VenueMedia { url, kind, ... }
+  // DB field is 'kind', frontend was looking for 'type'.
+  const rawGallery = venue.gallery || [];
+  const visualMedia = rawGallery.filter((m: any) => m.kind === 'image' || m.kind === 'video');
+  const menuPdfs = rawGallery.filter((m: any) => m.kind === 'pdf' || m.kind === 'menu_pdf');
+  const menuImages = rawGallery.filter((m: any) => m.kind === 'menu_image');
+
+  // If no gallery, fallback to coverImageUrl if available (though seed creates a gallery item for it)
+  if (visualMedia.length === 0 && venue.coverImageUrl) {
+    visualMedia.push({ url: venue.coverImageUrl, kind: 'image' });
+  }
 
   const openLightbox = (index: number) => setLightboxIndex(index);
   const closeLightbox = () => setLightboxIndex(null);
@@ -94,16 +106,24 @@ export default function VenueDetailPage() {
   const role = session?.user?.role;
   // @ts-ignore
   const userId = session?.user?.id; // Note: id might be directly on user or sub
-  // Standard NextAuth structure depends on callback. Assuming id is available as verified in actions.
-  // We'll check carefully. Use uid from token in logic, here relying on session shape.
-  // Actually, usually session.user.id if configured.
 
   const isOwner = userId === venue.ownerId;
   const isAdmin = role === "ADMIN";
   const canEdit = isOwner || isAdmin;
 
+
   return (
     <div className="max-w-7xl mx-auto pb-20 pt-4 px-4 sm:px-6">
+
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDelete}
+        title="Delete Venue?"
+        message="Are you sure you want to delete this venue? This action cannot be undone."
+        confirmLabel="Delete Forever"
+        isDestructive={true}
+      />
 
       {/* Lightbox Modal */}
       {lightboxIndex !== null && (
@@ -120,7 +140,7 @@ export default function VenueDetailPage() {
           </button>
 
           <div className="relative w-full h-full p-4 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            {visualMedia[lightboxIndex].type === 'video' ? (
+            {visualMedia[lightboxIndex].kind === 'video' ? (
               <video
                 src={visualMedia[lightboxIndex].url}
                 controls
@@ -161,7 +181,7 @@ export default function VenueDetailPage() {
                   <Edit className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={handleDelete}
+                  onClick={() => setShowDeleteModal(true)}
                   className="p-2 rounded-full bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
                   title="Delete Venue"
                 >
@@ -185,77 +205,88 @@ export default function VenueDetailPage() {
               : '★ Nouveau'}
           </span>
           <span>•</span>
-          <span className="text-white hover:underline cursor-pointer">{venue.city}, Morocco</span>
+          <span className="text-white hover:underline cursor-pointer">{venue.city?.name || 'Casablanca'}, Morocco</span>
           <span>•</span>
           <span>{venue.category}</span>
         </div>
       </div>
 
-      {/* Bento Grid (Mixed Media) */}
-      <div className="relative grid grid-cols-1 md:grid-cols-4 gap-2 h-[300px] md:h-[450px] rounded-2xl overflow-hidden mb-10 bg-black">
+      {/* Hero Image Section */}
+      <div className="relative grid grid-cols-1 md:grid-cols-4 gap-2 mb-10">
         {/* Main Item (Left Half) */}
         <div
-          className="md:col-span-2 h-full relative group cursor-pointer"
+          className="md:col-span-2 relative group cursor-pointer overflow-hidden rounded-2xl md:rounded-l-2xl md:rounded-r-none bg-black h-[300px] md:h-[450px]"
           onClick={() => visualMedia[0] && openLightbox(0)}
         >
           {visualMedia[0] ? (
             <>
-              {visualMedia[0].type === 'video' ? (
+              {visualMedia[0].kind === 'video' ? (
                 <video
                   src={visualMedia[0].url}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   muted
                   loop
                   onMouseEnter={(e) => e.currentTarget.play()}
                   onMouseLeave={(e) => e.currentTarget.pause()}
                 />
               ) : (
-                <img src={visualMedia[0].url} className="w-full h-full object-cover transition duration-700 group-hover:scale-105" alt="Main" />
+                <>
+                  <img
+                    src={visualMedia[0].url}
+                    className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+                    alt="Main"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </>
               )}
-              {visualMedia[0].type === 'video' && (
-                <div className="absolute top-4 right-4 bg-black/50 p-2 rounded-full pointer-events-none">
+              {visualMedia[0].kind === 'video' && (
+                <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm p-2 rounded-full pointer-events-none">
                   <Play className="w-4 h-4 text-white fill-white" />
+                </div>
+              )}
+              {visualMedia.length > 1 && (
+                <div className="absolute bottom-4 right-4 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-sm font-medium">
+                  +{visualMedia.length - 1} photos
                 </div>
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-white/5 text-white/20">No Image</div>
+            <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-white/20">No Image</div>
           )}
         </div>
 
-        {/* Small Items (Right Halves) */}
-        <div className="hidden md:grid md:col-span-2 grid-cols-2 grid-rows-2 gap-2 h-full">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="bg-white/5 relative overflow-hidden group cursor-pointer border border-white/5"
-              onClick={() => visualMedia[i] && openLightbox(i)}
-            >
-              {visualMedia[i] ? (
-                <>
-                  {visualMedia[i].type === 'video' ? (
-                    <video
-                      src={visualMedia[i].url}
-                      className="w-full h-full object-cover"
-                      muted
-                      loop
-                      onMouseEnter={(e) => e.currentTarget.play()}
-                      onMouseLeave={(e) => e.currentTarget.pause()}
-                    />
-                  ) : (
-                    <img src={visualMedia[i].url} className="w-full h-full object-cover transition duration-500 group-hover:scale-105" alt={`Gallery ${i}`} />
-                  )}
-                  {visualMedia[i].type === 'video' && (
-                    <div className="absolute top-2 right-2 bg-black/50 p-1.5 rounded-full pointer-events-none">
-                      <Play className="w-3 h-3 text-white fill-white" />
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-white/5 text-white/10">AGORA</div>
-              )}
-            </div>
-          ))}
+        {/* Small Items (Right Halves) - Only show if photos exist */}
+        <div className="hidden md:grid md:col-span-2 grid-cols-2 grid-rows-2 gap-2 rounded-r-2xl overflow-hidden h-[450px]">
+          {[1, 2, 3, 4].map((i) => {
+            // Only render if photo exists
+            if (!visualMedia[i]) return <div key={i} className="hidden" />;
+
+            return (
+              <div
+                key={i}
+                className="relative overflow-hidden group cursor-pointer bg-black"
+                onClick={() => openLightbox(i)}
+              >
+                {visualMedia[i].kind === 'video' ? (
+                  <video
+                    src={visualMedia[i].url}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    muted
+                    loop
+                    onMouseEnter={(e) => e.currentTarget.play()}
+                    onMouseLeave={(e) => e.currentTarget.pause()}
+                  />
+                ) : (
+                  <img src={visualMedia[i].url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={`Gallery ${i}`} />
+                )}
+                {visualMedia[i].kind === 'video' && (
+                  <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm p-1.5 rounded-full pointer-events-none">
+                    <Play className="w-3 h-3 text-white fill-white" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>   <button
         onClick={() => openLightbox(0)}
@@ -285,6 +316,99 @@ export default function VenueDetailPage() {
             <p className="text-white/80 leading-relaxed whitespace-pre-line">{venue.description || "No description provided."}</p>
           </div>
 
+          {/* Details / Tags Grid */}
+          <div className="border-b border-white/10 pb-8 space-y-6">
+            <h2 className="text-xl font-bold text-white">Details & Services</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Categories */}
+              {venue.subcategories?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-white/50 uppercase tracking-widest mb-3">Type</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {venue.subcategories.map((s: any) => (
+                      <span key={s.subcategory.id} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/80 text-sm">
+                        {s.subcategory.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Cuisines */}
+              {venue.cuisines?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-white/50 uppercase tracking-widest mb-3">Cuisine</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {venue.cuisines.map((c: any) => (
+                      <span key={c.cuisine.id} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/80 text-sm">
+                        {c.cuisine.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Vibes */}
+              {venue.vibes?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-white/50 uppercase tracking-widest mb-3">Ambiance</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {venue.vibes.map((v: any) => (
+                      <span key={v.vibe.id} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/80 text-sm">
+                        {v.vibe.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Music */}
+              {venue.musicTypes?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-white/50 uppercase tracking-widest mb-3">Music</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {venue.musicTypes.map((m: any) => (
+                      <span key={m.musicType.id} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/80 text-sm">
+                        {m.musicType.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Features */}
+              {venue.facilities?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-white/50 uppercase tracking-widest mb-3">Features</h3>
+                  <div className="space-y-2">
+                    {venue.facilities.map((f: any) => (
+                      <div key={f.facility.id} className="flex items-center gap-2 text-white/80 text-sm">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+                        {f.facility.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Policies */}
+              {venue.policies?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-white/50 uppercase tracking-widest mb-3">Policies</h3>
+                  <div className="space-y-2">
+                    {venue.policies.map((p: any) => (
+                      <div key={p.policy.id} className="flex items-center gap-2 text-white/80 text-sm">
+                        <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
+                        {p.policy.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Contact / Location */}
           <div className="border-b border-white/10 pb-8 space-y-4">
             <h2 className="text-xl font-bold text-white">Location & Contact</h2>
@@ -301,14 +425,28 @@ export default function VenueDetailPage() {
                   <span className="underline">View on Google Maps</span>
                 </a>
               )}
-              {venue.website && (
-                <a href={venue.website} target="_blank" className="flex items-center gap-3 hover:text-indigo-400">
-                  <Globe className="w-5 h-5 text-indigo-400" />
-                  <span>Website</span>
-                </a>
-              )}
+              <div className="flex gap-4 pt-2">
+                {venue.website && (
+                  <a href={venue.website} target="_blank" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm">
+                    <Globe className="w-4 h-4 text-indigo-400" />
+                    <span>Website</span>
+                  </a>
+                )}
+                {venue.instagram && (
+                  <a href={venue.instagram} target="_blank" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm">
+                    {/* Lucide doesn't have Instagram, using generic Globe or similar if needed, or text */}
+                    <span className="font-bold text-fuchsia-400">Instagram</span>
+                  </a>
+                )}
+                {venue.facebookUrl && (
+                  <a href={venue.facebookUrl} target="_blank" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm">
+                    <span className="font-bold text-blue-400">Facebook</span>
+                  </a>
+                )}
+              </div>
+
               {venue.phone && (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 mt-2">
                   <Phone className="w-5 h-5 text-indigo-400" />
                   <span>{venue.phone}</span>
                 </div>
@@ -316,19 +454,45 @@ export default function VenueDetailPage() {
             </div>
           </div>
 
-          {/* PDF Menus Only */}
-          {pdfs.length > 0 && (
-            <div>
-              <h2 className="text-xl font-bold text-white mb-4">Menus & Info</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-white/10 pb-8">
-                {pdfs.map((m: any) => (
+          {/* Menus */}
+          {/* Menus */}
+          {(venue.menuUrl || menuPdfs.length > 0 || menuImages.length > 0) && (
+            <div className="border-b border-white/10 pb-8">
+              <h2 className="text-xl font-bold text-white mb-4">Menu</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Main Menu URL */}
+                {venue.menuUrl && (
+                  <a href={venue.menuUrl} target="_blank" className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors group">
+                    <div className="p-3 bg-indigo-500/10 rounded-lg text-indigo-400 group-hover:scale-110 transition-transform">
+                      {venue.menuUrl.toLowerCase().endsWith('.pdf') ? <FileText className="w-6 h-6" /> : <Utensils className="w-6 h-6" />}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-white">View Full Menu</div>
+                      <div className="text-xs text-white/50">Click to open</div>
+                    </div>
+                  </a>
+                )}
+                {/* PDF Menus */}
+                {menuPdfs.map((m: any) => (
                   <a key={m.id} href={m.url} target="_blank" className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors group">
                     <div className="p-3 bg-red-500/10 rounded-lg text-red-400 group-hover:scale-110 transition-transform">
                       <FileText className="w-6 h-6" />
                     </div>
                     <div>
-                      <div className="font-semibold text-white">View Menu (PDF)</div>
+                      <div className="font-semibold text-white">Menu (PDF)</div>
                       <div className="text-xs text-white/50">Click to open</div>
+                    </div>
+                  </a>
+                ))}
+                {/* Image Menus */}
+                {menuImages.map((m: any, idx: number) => (
+                  <a key={m.id} href={m.url} target="_blank" className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors group">
+                    <div className="p-3 bg-indigo-500/10 rounded-lg text-indigo-400 group-hover:scale-110 transition-transform">
+                      <img src={m.url} className="w-8 h-8 object-cover rounded" alt={`Menu ${idx + 1}`} />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-white">Menu Page {idx + 1}</div>
+                      <div className="text-xs text-white/50">Click to view</div>
                     </div>
                   </a>
                 ))}

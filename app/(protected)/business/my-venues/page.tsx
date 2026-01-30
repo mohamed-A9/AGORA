@@ -5,44 +5,48 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteVenue } from "@/actions/venue-management";
 
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
+
 export default function MyVenuesPage() {
     const [venues, setVenues] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deleteId, setDeleteId] = useState<string | null>(null); // Track ID to delete
     const router = useRouter();
 
     useEffect(() => {
         (async () => {
-            const res = await fetch("/api/admin/venues?status=ALL"); // Reuse admin API? No, insecure if it lists all.
-            // We need a way to list MY venues.
-            // The admin API checks for ADMIN role.
-            // We should create a quick API or just fetch client side if we had an endpoint.
-            // Actually, let's use a server component ideally, but I'm writing client code here.
-            // I'll create a dedicated API /api/business/venues or just fetch from an action? 
-            // For now, let's use a new endpoint or the standard venues endpoint with filter?
-            // Standard /api/venues is PUBLIC and lists approved only.
-            // Business needs to see PENDING/REJECTED too.
-
-            // I will create a new API route: /api/business/my-venues
-            const res2 = await fetch("/api/business/my-venues");
-            const data = await res2.json().catch(() => ({}));
+            // Add timestamp to prevent browser caching
+            const res = await fetch(`/api/business/my-venues?t=${Date.now()}`);
+            const data = await res.json().catch(() => ({}));
             setVenues(data.venues || []);
             setLoading(false);
+            router.refresh(); // Sync server components
         })();
     }, []);
 
-    async function handleDelete(id: string) {
-        if (!confirm("Are you sure you want to delete this venue? This cannot be undone.")) return;
-
-        const res = await deleteVenue(id);
+    async function confirmDelete() {
+        if (!deleteId) return;
+        const res = await deleteVenue(deleteId);
         if (res.success) {
-            setVenues(venues.filter(v => v.id !== id));
+            setVenues(venues.filter(v => v.id !== deleteId));
         } else {
             alert("Error deleting venue");
         }
+        setDeleteId(null);
     }
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
+            <ConfirmationModal
+                isOpen={!!deleteId}
+                onClose={() => setDeleteId(null)}
+                onConfirm={confirmDelete}
+                title="Delete Venue?"
+                message="Are you sure you want to delete this venue? This action cannot be undone and all data will be lost."
+                confirmLabel="Delete Forever"
+                isDestructive={true}
+            />
+
             <div className="flex justify-between items-end border-b border-white/10 pb-6">
                 <div>
                     <h1 className="text-4xl font-extrabold text-white tracking-tight">My Venues</h1>
@@ -85,13 +89,13 @@ export default function MyVenuesPage() {
                         <div className="space-y-2">
                             <div className="flex justify-between items-start">
                                 <span className={`text-[10px] px-2 py-1 rounded-full border tracking-wide font-bold uppercase ${v.status === 'APPROVED' ? 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10' :
-                                        v.status === 'PENDING' ? 'border-amber-500/30 text-amber-300 bg-amber-500/10' :
-                                            'border-red-500/30 text-red-300 bg-red-500/10'
+                                    v.status === 'PENDING' ? 'border-amber-500/30 text-amber-300 bg-amber-500/10' :
+                                        'border-red-500/30 text-red-300 bg-red-500/10'
                                     }`}>
                                     {v.status}
                                 </span>
                                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleDelete(v.id)} className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Delete">
+                                    <button onClick={() => setDeleteId(v.id)} className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Delete">
                                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
                                     </button>
                                 </div>
@@ -99,17 +103,17 @@ export default function MyVenuesPage() {
 
                             <div>
                                 <h2 className="text-xl font-bold text-white leading-tight">{v.name}</h2>
-                                <div className="text-white/50 text-sm mt-1 font-medium">{v.city} • {v.category || "Venue"}</div>
+                                <div className="text-white/50 text-sm mt-1 font-medium">{typeof v.city === 'object' ? v.city?.name : v.city} • {v.category || "Venue"}</div>
                             </div>
                         </div>
 
                         {/* Footer Actions */}
                         <div className="pt-4 border-t border-white/5 flex items-center gap-2 mt-2">
                             <Link
-                                href={`/business/edit-venue/${v.id}`}
+                                href={v.status === 'DRAFT' ? `/business/add-venue?id=${v.id}` : `/business/edit-venue/${v.id}`}
                                 className="flex-1 text-center bg-white/10 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-indigo-500 hover:text-white transition-all"
                             >
-                                Edit Details
+                                {v.status === 'DRAFT' ? 'Continue Draft' : 'Edit Details'}
                             </Link>
                             <Link
                                 href={`/venue/${v.id}`}

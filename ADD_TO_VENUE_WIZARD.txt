@@ -1,0 +1,54 @@
+// Add this new useEffect AFTER the existing loadDraft useEffect in VenueWizard.tsx
+// Place it around line 100 (after the first useEffect)
+
+// ============================================
+// CREATE EMPTY DRAFT IMMEDIATELY ON MOUNT
+// ============================================
+useEffect(() => {
+    const createEmptyDraftIfNeeded = async () => {
+        // Wait for initial load to complete
+        if (!isLoaded) return;
+        
+        // Skip if we already have a venueId (from URL or localStorage or DB)
+        if (venueId) {
+            console.log("✅ Venue ID already exists:", venueId);
+            return;
+        }
+        
+        // Skip if initialId was provided (editing existing)
+        if (initialId) return;
+
+        console.log("🆕 No venue ID found. Creating empty draft...");
+
+        try {
+            const res = await fetch('/api/venues/create-empty-draft', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await res.json();
+
+            if (data.success && data.venueId) {
+                console.log("✅ Empty draft created with ID:", data.venueId);
+                
+                // Save to state
+                setVenueId(data.venueId);
+                
+                // Save to localStorage
+                localStorage.setItem("agora_wizard_venue_id", data.venueId);
+                localStorage.setItem("agora_wizard_step", "1");
+                
+                // Update URL so refresh works
+                window.history.replaceState(null, "", `?id=${data.venueId}`);
+                
+                console.log("✅ Empty draft ready. User can now type and auto-save!");
+            } else {
+                console.error("❌ Failed to create empty draft:", data.error);
+            }
+        } catch (err) {
+            console.error("❌ Error creating empty draft:", err);
+        }
+    };
+
+    createEmptyDraftIfNeeded();
+}, [isLoaded, venueId, initialId]);

@@ -81,6 +81,18 @@ export async function updateVenue(formData: FormData) {
     if (!venue || (venue.ownerId !== session.user.id && role !== "ADMIN")) return { error: "Forbidden" };
 
     try {
+        // Prepare relational data slugs
+        const subcategorySlug = data.subcategory?.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const cuisineSlug = data.cuisine?.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const vibeSlug = data.ambiance?.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+        // Prepare Facilities
+        const facilitiesToConnect: string[] = [];
+        if (formData.get("parkingAvailable") === "on") facilitiesToConnect.push("PARKING");
+        if (formData.get("valetParking") === "on") facilitiesToConnect.push("VALET");
+        if (formData.get("wheelchairAccessible") === "on") facilitiesToConnect.push("DISABLED_ACCESS");
+        if (formData.get("hasBabyChairs") === "on") facilitiesToConnect.push("BABY_CHAIR");
+
         // Transaction to update details and media
         await prisma.$transaction(async (tx: any) => {
             // Update basic fields
@@ -89,22 +101,45 @@ export async function updateVenue(formData: FormData) {
                 data: {
                     name: data.name,
                     description: data.description,
-                    city: data.city,
-                    category: data.category,
-                    subcategory: data.subcategory,
-                    specialization: data.specialization,
+                    // city: data.city, // City is relation now
+                    // For Simplicity, we assume City Name exists.
+                    city: (data.city && data.city !== "[object Object]") ? { connect: { name: data.city } } : undefined,
+                    // mainCategory: data.category, // Enum? User sends string. Needs casting?
+                    mainCategory: data.category.toUpperCase().replace(" ", "_") as any,
                     venueTypeId: data.venueTypeId,
                     address: data.address,
                     locationUrl: data.locationUrl,
                     website: data.website,
                     phone: data.phone,
                     reservationsEnabled: data.reservationsEnabled,
-                    ambiance: data.ambiance,
-                    cuisine: data.cuisine,
-                    musicStyle: data.musicStyle,
                     openingHours: data.openingHours,
                     weeklySchedule: data.weeklySchedule ?? undefined,
-                    // eventTypes: data.eventTypes // TODO: Add to schema or attributes
+                    neighborhood: formData.get("neighborhood") as string || undefined,
+
+                    // RELATIONS UPDATE (Delete All + Re-create for single-selects)
+
+                    subcategories: subcategorySlug ? {
+                        deleteMany: {},
+                        create: { subcategory: { connect: { slug: subcategorySlug } } }
+                    } : { deleteMany: {} },
+
+                    cuisines: cuisineSlug ? {
+                        deleteMany: {},
+                        create: { cuisine: { connect: { slug: cuisineSlug } } }
+                    } : { deleteMany: {} },
+
+                    vibes: vibeSlug ? {
+                        deleteMany: {},
+                        create: { vibe: { connect: { slug: vibeSlug } } }
+                    } : { deleteMany: {} },
+
+                    // Facilities
+                    facilities: {
+                        deleteMany: {},
+                        create: facilitiesToConnect.map(code => ({
+                            facility: { connect: { code } }
+                        }))
+                    }
                 }
             });
 
@@ -113,13 +148,20 @@ export async function updateVenue(formData: FormData) {
             // BUT this loses potential "createdAt".
             // Better: The input `media` is the NEW state.
 
-            await tx.media.deleteMany({ where: { venueId: data.id } });
+            // Handle Media
+            // Note: Schema defines relation as 'gallery' -> VenueMedia table.
+            // Prisma Client usually exposes this as `venue.gallery`.
+            // Check if `tx.venueMedia` exists or if we should use `tx.gallery`? 
+            // Usually `tx.venueMedia` represents the model delegate.
+
+            await tx.venueMedia.deleteMany({ where: { venueId: data.id } });
+
             if (data.media && data.media.length > 0) {
-                await tx.media.createMany({
+                await tx.venueMedia.createMany({
                     data: data.media.map(m => ({
                         venueId: data.id,
                         url: m.url,
-                        type: m.type
+                        kind: m.type // Schema uses 'kind', input uses 'type'
                     }))
                 });
             }
@@ -129,7 +171,7 @@ export async function updateVenue(formData: FormData) {
 
         const updatedVenue = await prisma.venue.findUnique({
             where: { id: data.id },
-            include: { media: true }
+            include: { gallery: true }
         });
 
         revalidatePath(`/venue/${data.id}`);

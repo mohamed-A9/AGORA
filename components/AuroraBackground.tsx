@@ -36,7 +36,7 @@ export default function AuroraBackground({ children }: { children: React.ReactNo
     }, []);
 
     return (
-        <div className="relative min-h-screen w-full bg-[#050B14] overflow-x-hidden">
+        <div className="relative min-h-screen w-full bg-[#050B14]">
             {/* Intense Aurora Background (Optimized: Reduced Blur amount if possible, but keeping for style) */}
             <div className="fixed inset-0 w-full h-full bg-[#050B14] pointer-events-none z-0">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-purple-600/30 blur-[80px] animate-pulse mix-blend-screen will-change-transform" />

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { Menu, X, User, LayoutDashboard, Calendar, Store, LogOut } from "lucide-react";
+import { Menu, X, User, LayoutDashboard, Calendar, Store, LogOut, Settings } from "lucide-react";
 import { useState } from "react";
 
 export default function Header() {
@@ -15,51 +15,66 @@ export default function Header() {
     const role = (session?.user as any)?.role;
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-black/80 backdrop-blur-md border-b border-white/5">
+        <header className="sticky top-0 left-0 right-0 z-50 transition-all duration-300 bg-gradient-to-b from-black/90 to-black/80 backdrop-blur-xl border-b border-white/10 shadow-2xl shadow-black/50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-20">
+                <div className="flex items-center justify-between h-14 md:h-20">
                     {/* Logo */}
                     <Link href="/">
-                        <img src="/logo.png" alt="AGORA" className="h-10 w-auto object-contain hover:scale-105 transition-transform" />
+                        <img src="/logo.png" alt="AGORA" className="h-8 md:h-10 w-auto object-contain hover:scale-110 transition-transform duration-300 drop-shadow-lg" />
                     </Link>
 
                     {/* Desktop Menu */}
                     <div className="hidden md:flex items-center gap-8">
                         {/* Common Links - Hidden for Business */}
-                        {role !== 'BUSINESS' && (
-                            <Link href="/explore" className="text-white/70 hover:text-white font-medium transition-colors">
-                                Explore
-                            </Link>
-                        )}
+                        <Link href="/explore" className="text-white/70 hover:text-white font-semibold transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
+                            <span>Explore</span>
+                            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
+                        </Link>
 
                         {/* Role Based Links */}
                         {session && (
                             <>
                                 {role === 'USER' && (
                                     <>
-                                        <Link href="/reservations" className="text-white/70 hover:text-white font-medium transition-colors flex items-center gap-2">
+                                        <Link href="/reservations" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                             <Calendar className="w-4 h-4" />
-                                            Reservations
+                                            <span>Reservations</span>
+                                            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
                                         </Link>
-                                        <Link href="/profile" className="text-white/70 hover:text-white font-medium transition-colors flex items-center gap-2">
+                                        <Link href="/profile" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                             <User className="w-4 h-4" />
-                                            Profil & Préférences
+                                            <span>Profile</span>
+                                            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
                                         </Link>
                                     </>
                                 )}
+                                {role === 'ADMIN' && (
+                                    <Link href="/admin" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
+                                        <LayoutDashboard className="w-4 h-4" />
+                                        <span>Admin</span>
+                                        <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-red-500 to-orange-500 group-hover:w-full transition-all duration-300"></span>
+                                    </Link>
+                                )}
                                 {role === 'BUSINESS' && (
                                     <>
-                                        <Link href="/business/reservations" className="text-white/70 hover:text-white font-medium transition-colors flex items-center gap-2">
+                                        <Link href="/business/reservations" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                             <Calendar className="w-4 h-4" />
-                                            Réservations
+                                            <span>Reservations</span>
+                                            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
                                         </Link>
-                                        <Link href="/business/events" className="text-white/70 hover:text-white font-medium transition-colors flex items-center gap-2">
+                                        <Link href="/business/events" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                             <Store className="w-4 h-4" />
-                                            Soirées
+                                            <span>Events</span>
+                                            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
                                         </Link>
-                                        <Link href="/business/my-venues" className="text-white/70 hover:text-white font-medium transition-colors flex items-center gap-2">
+                                        <Link href="/business/my-venues" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                             <Store className="w-4 h-4" />
-                                            Mes Lieux
+                                            <span>My Venues</span>
+                                            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
+                                        </Link>
+                                        <Link href="/profile" title="Account Settings" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
+                                            <Settings className="w-4 h-4 text-white/40" />
+                                            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-zinc-500 group-hover:w-full transition-all duration-300"></span>
                                         </Link>
                                     </>
                                 )}
@@ -73,7 +88,7 @@ export default function Header() {
                             <div className="flex items-center gap-4 pl-4 border-l border-white/10">
                                 <Link
                                     href={role === 'BUSINESS' ? '/business/dashboard' : '/dashboard'}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600/20 to-purple-600/20 hover:from-indigo-600/30 hover:to-purple-600/30 text-white font-semibold transition-all duration-300 border border-indigo-500/20 hover:border-indigo-500/40 hover:scale-105 shadow-lg shadow-indigo-500/10"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
                                     <span>Dashboard</span>
@@ -81,10 +96,11 @@ export default function Header() {
 
                                 <button
                                     onClick={() => signOut({ callbackUrl: '/' })}
-                                    className="p-2 text-white/50 hover:text-red-400 transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-gradient-to-r hover:from-red-600/20 hover:to-red-500/20 text-white/70 hover:text-red-400 font-semibold transition-all duration-300 border border-white/10 hover:border-red-500/40 hover:scale-105 group"
                                     title="Sign out"
                                 >
-                                    <LogOut className="w-5 h-5" />
+                                    <LogOut className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                                    <span>Log out</span>
                                 </button>
                             </div>
                         ) : (
@@ -121,15 +137,13 @@ export default function Header() {
             {isOpen && (
                 <div className="md:hidden bg-black/95 backdrop-blur-xl border-b border-white/5">
                     <div className="px-4 pt-2 pb-6 space-y-2">
-                        {role !== 'BUSINESS' && (
-                            <Link
-                                href="/explore"
-                                className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium"
-                                onClick={close}
-                            >
-                                Explore
-                            </Link>
-                        )}
+                        <Link
+                            href="/explore"
+                            className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium"
+                            onClick={close}
+                        >
+                            Explore
+                        </Link>
 
                         {session ? (
                             <>
@@ -150,6 +164,15 @@ export default function Header() {
                                             Profil & Préférences
                                         </Link>
                                     </>
+                                )}
+                                {role === 'ADMIN' && (
+                                    <Link
+                                        href="/admin"
+                                        className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium"
+                                        onClick={close}
+                                    >
+                                        Admin Panel
+                                    </Link>
                                 )}
                                 {role === 'BUSINESS' && (
                                     <>
@@ -174,6 +197,13 @@ export default function Header() {
                                         >
                                             Mes Lieux
                                         </Link>
+                                        <Link
+                                            href="/profile"
+                                            className="block px-4 py-3 text-white/40 hover:text-white hover:bg-white/5 rounded-xl font-medium flex items-center gap-2"
+                                            onClick={close}
+                                        >
+                                            <Settings className="w-4 h-4" /> Account Settings
+                                        </Link>
                                     </>
                                 )}
                                 <div className="h-px bg-white/10 my-2" />
@@ -186,9 +216,10 @@ export default function Header() {
                                 </Link>
                                 <button
                                     onClick={() => { signOut(); close(); }}
-                                    className="w-full text-left px-4 py-3 text-red-400 hover:bg-white/5 rounded-xl font-medium"
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl font-semibold border border-red-500/20 hover:border-red-500/40 transition-all duration-300"
                                 >
-                                    Sign out
+                                    <LogOut className="w-4 h-4" />
+                                    <span>Log out</span>
                                 </button>
                             </>
                         ) : (

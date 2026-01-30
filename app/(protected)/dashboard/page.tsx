@@ -48,6 +48,23 @@ export default function DashboardPage() {
     );
   }
 
+  // Safety check for data
+  if (!data?.stats) {
+    if (loading) return null; // Should be handled above, but just in case
+    // If not loading and no stats, it might be an error state
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-white/50 gap-4">
+        <p>Une erreur est survenue lors du chargement des données.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-indigo-500 rounded-lg text-white font-bold"
+        >
+          Réessayer
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-10 pb-20">
       {/* Welcome Header */}
@@ -67,10 +84,10 @@ export default function DashboardPage() {
 
       {/* Stats Quick Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={Calendar} label="Réservations" value={data?.stats.reservations || 0} color="text-indigo-400" />
-        <StatCard icon={Star} label="Avis donnés" value={data?.stats.reviews || 0} color="text-amber-400" />
-        <StatCard icon={TrendingUp} label="Points Agora" value={Math.floor((data?.stats.reservations || 0) * 10)} color="text-emerald-400" />
-        <StatCard icon={History} label="Visites" value={data?.stats.reservations || 0} color="text-fuchsia-400" />
+        <StatCard icon={Calendar} label="Réservations" value={data?.stats?.reservations || 0} color="text-indigo-400" />
+        <StatCard icon={Star} label="Avis donnés" value={data?.stats?.reviews || 0} color="text-amber-400" />
+        <StatCard icon={TrendingUp} label="Points Agora" value={Math.floor((data?.stats?.reservations || 0) * 10)} color="text-emerald-400" />
+        <StatCard icon={History} label="Visites" value={data?.stats?.reservations || 0} color="text-fuchsia-400" />
       </div>
 
       <div className="grid gap-10">

@@ -2,6 +2,7 @@ import "./globals.css";
 import Providers from "./providers";
 import AuroraBackground from "@/components/AuroraBackground";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 
 export const metadata = {
   title: "AGORA",
@@ -34,13 +35,14 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <Providers>
           <AuroraBackground>
             <Header />
-            <div className="pt-24 px-4 pb-12 opacity-0 animate-slide-up" style={{ animationFillMode: "forwards" }}>
+            <div className="pt-0 px-4 pb-0">
               {children}
             </div>
+            <Footer />
           </AuroraBackground>
         </Providers>
       </body>

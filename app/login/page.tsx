@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, Suspense } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Cookies from "js-cookie";
 
 type Status = "idle" | "loading";
 
@@ -50,6 +51,24 @@ function LoginPageContent() {
     if (error) setError(null);
   }, [email, password]);
 
+  const intendedRole = useMemo(() => {
+    return sp.get("role") === "business" ? "BUSINESS" : "USER";
+  }, [sp]);
+
+  useEffect(() => {
+    const errorType = sp.get("error");
+    if (errorType === "WRONG_ROLE") {
+      // We can try to guess the conflicting role from the URL or current state
+      // If I am trying to log in as Business (intendedRole=BUSINESS) and failed, it means I have a User account.
+      setError(`This email is already registered as a ${intendedRole === "BUSINESS" ? "Member" : "Business"} account.`);
+    } else if (errorType === "AccessDenied") {
+      setError("Access denied. Please try again.");
+    } else if (errorType) {
+      // generic
+      setError("An error occurred during login.");
+    }
+  }, [sp, intendedRole]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -58,6 +77,7 @@ function LoginPageContent() {
     const res = await signIn("credentials", {
       email,
       password,
+      role: intendedRole,
       redirect: false,
       callbackUrl: "/home",
     });
@@ -67,6 +87,10 @@ function LoginPageContent() {
     if (res?.error) {
       if (res.error === "EMAIL_NOT_VERIFIED") {
         setError("Veuillez vérifier votre email avant de vous connecter.");
+        return;
+      }
+      if (res.error === "WRONG_ROLE") {
+        setError(`This email is already associated with a ${intendedRole === "USER" ? "Business" : "User"} account.`);
         return;
       }
       setError("Email ou mot de passe incorrect.");
@@ -79,7 +103,7 @@ function LoginPageContent() {
     if (callbackUrl) {
       router.push(callbackUrl);
     } else {
-      router.push(role === "BUSINESS" ? "/business/dashboard" : "/dashboard");
+      router.push(intendedRole === "BUSINESS" ? "/business/dashboard" : "/dashboard");
     }
   }
 
@@ -129,7 +153,11 @@ function LoginPageContent() {
                 {/* Social Buttons */}
                 <div className="flex flex-col gap-2.5">
                   <button
-                    onClick={() => signIn("google", { callbackUrl: "/home" })}
+                    onClick={() => {
+                      Cookies.remove("signup-role", { path: '/' }); // Clear any old signup-role
+                      Cookies.set("login-role", intendedRole, { expires: 1, path: '/' });
+                      signIn("google", { callbackUrl: "/home" });
+                    }}
                     className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/10"
                   >
                     <svg className="h-4 w-4" viewBox="0 0 24 24">
@@ -142,7 +170,11 @@ function LoginPageContent() {
                   </button>
 
                   <button
-                    onClick={() => signIn("facebook", { callbackUrl: "/home" })}
+                    onClick={() => {
+                      Cookies.remove("signup-role", { path: '/' }); // Clear any old signup-role
+                      Cookies.set("login-role", intendedRole, { expires: 1, path: '/' });
+                      signIn("facebook", { callbackUrl: "/home" });
+                    }}
                     className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-[#1877F2]/20 px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1877F2]/30"
                   >
                     <svg className="h-4 w-4 text-[#1877F2]" fill="currentColor" viewBox="0 0 24 24">

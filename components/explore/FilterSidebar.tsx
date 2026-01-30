@@ -1,399 +1,373 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { moroccanCities, VENUE_CATEGORIES, DRESS_CODES, AGE_POLICIES, PAYMENT_METHODS, AMBIANCES, CUISINES } from "@/lib/constants";
-import { EVENT_TYPES, getGenresForType } from "@/lib/event-taxonomy";
-import { X, Filter, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import { moroccanCities } from "@/lib/constants";
+import { TAXONOMY } from "@/lib/taxonomy";
 
 interface FilterSidebarProps {
     filters: any;
-    setFilters: (filters: any) => void;
+    setFilters: (f: any) => void;
     className?: string;
     onClose?: () => void;
 }
 
 export default function FilterSidebar({ filters, setFilters, className = "", onClose }: FilterSidebarProps) {
-    const [expandedSection, setExpandedSection] = useState<string | null>("location");
+    const [localFilters, setLocalFilters] = useState(filters);
+    const [featuresOpen, setFeaturesOpen] = useState(false); // For Policies
+    const [showAllCuisines, setShowAllCuisines] = useState(false);
+    const [showAllTypes, setShowAllTypes] = useState(false);
 
-    const toggleSection = (section: string) => {
-        setExpandedSection(expandedSection === section ? null : section);
+    useEffect(() => {
+        setLocalFilters(filters);
+    }, [filters]);
+
+    const update = (key: string, val: any) => {
+        setLocalFilters((prev: any) => ({ ...prev, [key]: val }));
     };
 
-    const updateFilter = (key: string, value: any) => {
-        setFilters({ ...filters, [key]: value });
+    // Generic multi-select toggle
+    const toggleArrayItem = (key: string, item: string) => {
+        setLocalFilters((prev: any) => {
+            let current = prev[key];
+            if (typeof current === 'string') current = [current];
+            if (!Array.isArray(current)) current = [];
+
+            const normalize = (s: string) => s.toLowerCase();
+
+            if (current.some((i: string) => normalize(i) === normalize(item))) {
+                return { ...prev, [key]: current.filter((i: string) => normalize(i) !== normalize(item)) };
+            } else {
+                return { ...prev, [key]: [...current, item] };
+            }
+        });
     };
 
-    const toggleArrayFilter = (key: string, item: string) => {
-        const current = filters[key] || [];
-        if (current.includes(item)) {
-            updateFilter(key, current.filter((i: string) => i !== item));
-        } else {
-            updateFilter(key, [...current, item]);
-        }
+    const getArray = (key: string): string[] => {
+        const val = localFilters[key];
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string' && val.length > 0) return [val];
+        return [];
+    }
+
+    // Toggle Booleans (Policies/Features)
+    const toggleFeature = (featureKey: string) => {
+        setLocalFilters((prev: any) => {
+            const currentFeatures = prev.features || {};
+            return {
+                ...prev,
+                features: {
+                    ...currentFeatures,
+                    [featureKey]: !currentFeatures[featureKey]
+                }
+            };
+        });
+    }
+
+    const apply = () => {
+        setFilters(localFilters);
+        if (onClose) onClose();
     };
+
+    const clear = () => {
+        const empty = {
+            city: localFilters.city,
+            category: [],
+            subcategory: [],
+            ambiance: [], // vibe
+            musicStyle: [],
+            features: {},
+            cuisine: []
+        };
+        setLocalFilters(empty);
+        setFilters(empty);
+    };
+
+    // --- Dynamic Data Helpers ---
+
+    // 1. Get relevant Subcategories based on Selected Category
+    const selectedCats = getArray("category");
+    let relevantSubcats: string[] = [];
+
+    if (selectedCats.length > 0) {
+        // Find keys in TAXONOMY.SUBCATEGORIES matching selected labels
+        // UI sends labels like "Restaurant", Taxonomy keys are "RESTAURANT"
+        // Need to map Label -> Value (ENUM)
+        // Normalize helper
+        const normalize = (s: string) => s.toLowerCase().trim().replace(/&/g, 'and').replace(/\s+/g, ' ');
+
+        selectedCats.forEach(label => {
+            // Try exact match first
+            let entry = TAXONOMY.CATEGORIES.find(c => c.label.toLowerCase() === label.toLowerCase());
+
+            // If not found, try normalized match (handling ' & ' vs ' and ' vs encoded)
+            if (!entry) {
+                const normLabel = normalize(label);
+                entry = TAXONOMY.CATEGORIES.find(c => normalize(c.label) === normLabel);
+            }
+
+            // Fallback: Partial Match (e.g. "Clubs" -> "Clubs & Party")
+            if (!entry) {
+                entry = TAXONOMY.CATEGORIES.find(c => {
+                    // Check if 'Clubs' is in 'Clubs & Party'
+                    // Or precise known keys
+                    if (label.toLowerCase().includes("club") && c.value === "CLUBS_PARTY") return true;
+                    if (label.toLowerCase().includes("activities") && c.value === "ACTIVITIES_FUN") return true;
+                    if (label.toLowerCase().includes("activity") && c.value === "ACTIVITIES_FUN") return true;
+                    return false;
+                });
+            }
+
+            if (entry) {
+                const key = entry.value as keyof typeof TAXONOMY.SUBCATEGORIES;
+                if (TAXONOMY.SUBCATEGORIES[key]) {
+                    relevantSubcats.push(...TAXONOMY.SUBCATEGORIES[key]);
+                }
+            }
+        });
+    } else {
+        // Default: Show Activities & Fun + Nightlife basics? Or just Activities?
+        // User requested "Extended Maximum". Let's show a mix or just Activities for discovery.
+        // Actually, listing ALL is too much (100+).
+        // Let's show "Activities & Fun" by default if nothing selected, as that's often what people browse type-wise.
+        relevantSubcats = TAXONOMY.SUBCATEGORIES.ACTIVITIES_FUN;
+    }
+    // Dedup
+    relevantSubcats = Array.from(new Set(relevantSubcats));
 
     return (
-        <div className={`flex flex-col ${className}`}>
-            <div className="p-4 border-b border-white/10 flex justify-between items-center lg:hidden">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Filter size={20} /> Filters
-                </h2>
+        <div className={`flex flex-col h-full bg-black/40 backdrop-blur-3xl border-r border-white/5 ${className}`}>
+            {/* Header */}
+            <div className="p-4 border-b border-white/5 flex items-center justify-between bg-transparent sticky top-0 z-10">
+                <h2 className="text-lg font-bold text-white tracking-tight">Filters</h2>
                 {onClose && (
-                    <button onClick={onClose} className="text-white/70 hover:text-white">
-                        <X size={24} />
+                    <button onClick={onClose} className="p-2 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/5">
+                        <X size={20} />
                     </button>
                 )}
             </div>
 
-            <div className="p-4 space-y-6 pb-24">
-                {/* Location */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("location")}>
-                        <h3 className="font-semibold text-white">Location</h3>
-                        {expandedSection === "location" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
-                    </div>
-                    {expandedSection === "location" && (
+            <div className="flex-1 overflow-y-auto px-4 py-2 space-y-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+
+                {/* 1. CITY */}
+                <div className="space-y-4 pt-4">
+                    <label className="text-xs font-bold text-white/50 uppercase tracking-widest">City</label>
+                    <div className="relative">
                         <select
-                            value={filters.city || ""}
-                            onChange={(e) => updateFilter("city", e.target.value)}
-                            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
+                            value={localFilters.city}
+                            onChange={(e) => update("city", e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 appearance-none"
                         >
-                            <option value="">All Cities</option>
-                            {moroccanCities.map(city => (
-                                <option key={city} value={city}>{city}</option>
+                            <option value="" disabled>Select a city</option>
+                            {moroccanCities.map(c => (
+                                <option key={c} value={c} className="bg-zinc-900">{c}</option>
                             ))}
                         </select>
-                    )}
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 pointer-events-none" size={16} />
+                    </div>
                 </div>
 
-                <div className="h-px bg-white/5" />
-
-                {/* Categories */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("categories")}>
-                        <h3 className="font-semibold text-white">Category</h3>
-                        {expandedSection === "categories" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
-                    </div>
-                    {expandedSection === "categories" && (
-                        <div className="flex flex-wrap gap-2">
-                            {VENUE_CATEGORIES.map(cat => (
+                {/* 2. MAIN CATEGORY */}
+                <div className="space-y-4">
+                    <label className="text-xs font-bold text-white/50 uppercase tracking-widest">Category</label>
+                    <div className="flex flex-wrap gap-2">
+                        {TAXONOMY.CATEGORIES.map(c => {
+                            const isSelected = getArray("category").includes(c.label);
+                            return (
                                 <button
-                                    key={cat}
-                                    onClick={() => updateFilter("category", filters.category === cat ? "" : cat)}
-                                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${filters.category === cat
-                                        ? "bg-white text-black border-white"
-                                        : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                                    key={c.value}
+                                    onClick={() => toggleArrayItem("category", c.label)} // Send Label "Restaurant"
+                                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200 flex items-center gap-2 ${isSelected
+                                        ? "bg-white text-black border-white shadow-lg shadow-white/10 transform scale-105"
+                                        : "bg-transparent border-white/10 text-white/70 hover:border-white/30 hover:text-white hover:bg-white/5"
                                         }`}
                                 >
-                                    {cat}
+                                    <span>{c.icon}</span>
+                                    {c.label}
                                 </button>
-                            ))}
-                        </div>
-                    )}
+                            )
+                        })}
+                    </div>
                 </div>
 
-                <div className="h-px bg-white/5" />
-
-                {/* Features */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("features")}>
-                        <h3 className="font-semibold text-white">Features</h3>
-                        {expandedSection === "features" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
+                {/* 3. SUB CATEGORIES (Type / Activity) */}
+                <div className="space-y-4">
+                    <label className="text-xs font-bold text-white/50 uppercase tracking-widest">
+                        {selectedCats.length > 0 ? "Venue Type" : "Activities & Entertainment"}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                        {(showAllTypes ? relevantSubcats : relevantSubcats.slice(0, 12)).map(t => {
+                            const isSelected = getArray("subcategory").includes(t);
+                            return (
+                                <button
+                                    key={t}
+                                    onClick={() => toggleArrayItem("subcategory", t)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 ${isSelected
+                                        ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-200"
+                                        : "bg-transparent border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                                        }`}
+                                >
+                                    {t}
+                                </button>
+                            )
+                        })}
+                        {relevantSubcats.length > 12 && !showAllTypes && (
+                            <button onClick={() => setShowAllTypes(true)} className="text-xs text-white/40 hover:text-white underline px-2">
+                                + {relevantSubcats.length - 12} more
+                            </button>
+                        )}
+                        {showAllTypes && (
+                            <button onClick={() => setShowAllTypes(false)} className="text-xs text-white/40 hover:text-white underline px-2">
+                                Show Less
+                            </button>
+                        )}
                     </div>
-                    {expandedSection === "features" && (
-                        <div className="space-y-2">
-                            {[
-                                { key: 'parkingAvailable', label: 'Parking Available' },
-                                { key: 'valetParking', label: 'Valet Service' },
-                                { key: 'reservationsEnabled', label: 'Accepts Reservations' }
-                            ].map(feature => (
-                                <label key={feature.key} className="flex items-center gap-3 cursor-pointer group">
-                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${filters.features?.[feature.key] ? "bg-indigo-600 border-indigo-600" : "border-zinc-600 group-hover:border-zinc-500"
-                                        }`}>
-                                        {filters.features?.[feature.key] && <span className="text-xs text-white">✓</span>}
-                                    </div>
-                                    <input
-                                        type="checkbox"
-                                        className="hidden"
-                                        checked={filters.features?.[feature.key] || false}
-                                        onChange={(e) => {
-                                            const newFeatures = { ...filters.features, [feature.key]: e.target.checked };
-                                            // Remove false keys to keep url clean
-                                            if (!e.target.checked) delete newFeatures[feature.key];
-                                            updateFilter("features", newFeatures);
-                                        }}
-                                    />
-                                    <span className="text-zinc-300 text-sm">{feature.label}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
                 </div>
 
-                <div className="h-px bg-white/5" />
-
-                {/* Dress Code */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("dressCode")}>
-                        <h3 className="font-semibold text-white">Dress Code</h3>
-                        {expandedSection === "dressCode" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
-                    </div>
-                    {expandedSection === "dressCode" && (
-                        <div className="space-y-2">
-                            {DRESS_CODES.map(code => (
-                                <label key={code} className="flex items-center gap-3 cursor-pointer group">
-                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${filters.dressCode?.includes(code) ? "border-indigo-500" : "border-zinc-600"
-                                        }`}>
-                                        {filters.dressCode?.includes(code) && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
-                                    </div>
-                                    <input
-                                        type="checkbox"
-                                        className="hidden"
-                                        checked={filters.dressCode?.includes(code) || false}
-                                        onChange={() => toggleArrayFilter("dressCode", code)}
-                                    />
-                                    <span className="text-zinc-300 text-sm">{code}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="h-px bg-white/5" />
-
-                {/* Date & Time Selection */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("date")}>
-                        <h3 className="font-semibold text-white">Events Date & Time</h3>
-                        {expandedSection === "date" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
-                    </div>
-                    {expandedSection === "date" && (
-                        <div className="space-y-3">
-                            <input
-                                type="date"
-                                value={filters.date || ""}
-                                onChange={(e) => updateFilter("date", e.target.value)}
-                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
-                            />
-                            <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-bold text-zinc-500 px-1">Starting After (Events)</label>
-                                <input
-                                    type="time"
-                                    value={filters.startTime || ""}
-                                    onChange={(e) => updateFilter("startTime", e.target.value)}
-                                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
-                                />
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                <div className="h-px bg-white/5" />
-
-                {/* Opening Hours Filter */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("opening")}>
-                        <h3 className="font-semibold text-white">Opening Hours</h3>
-                        {expandedSection === "opening" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
-                    </div>
-                    {expandedSection === "opening" && (
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <p className="text-[10px] uppercase font-bold text-zinc-500 px-1">Days</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => (
-                                        <button
-                                            key={day}
-                                            onClick={() => {
-                                                const current = filters.openingDays || [];
-                                                const next = current.includes(day) ? current.filter((d: string) => d !== day) : [...current, day];
-                                                updateFilter("openingDays", next);
-                                            }}
-                                            className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${filters.openingDays?.includes(day)
-                                                ? "bg-indigo-600 text-white"
-                                                : "bg-white/5 text-white/50 border border-white/5"
-                                                }`}
-                                        >
-                                            {day.slice(0, 3)}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] uppercase font-bold text-zinc-500 px-1">Open At</label>
-                                    <input
-                                        type="time"
-                                        value={filters.startHour || ""}
-                                        onChange={(e) => updateFilter("startHour", e.target.value)}
-                                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm outline-none"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] uppercase font-bold text-zinc-500 px-1">Close At</label>
-                                    <input
-                                        type="time"
-                                        value={filters.endHour || ""}
-                                        onChange={(e) => updateFilter("endHour", e.target.value)}
-                                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm outline-none"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                <div className="h-px bg-white/5" />
-
-                {/* Event Filters */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("events")}>
-                        <h3 className="font-semibold text-white">Upcoming Events</h3>
-                        {expandedSection === "events" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
-                    </div>
-                    {expandedSection === "events" && (
-                        <div className="space-y-4">
-                            <select
-                                value={filters.eventType || ""}
-                                onChange={(e) => {
-                                    updateFilter("eventType", e.target.value);
-                                    updateFilter("eventGenre", ""); // Reset genre on type change
-                                }}
-                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
-                            >
-                                <option value="">Any Event Type</option>
-                                {EVENT_TYPES.map(t => (
-                                    <option key={t.id} value={t.id}>{t.label}</option>
-                                ))}
-                            </select>
-
-                            {filters.eventType && (
-                                <div className="space-y-2">
-                                    <p className="text-xs text-white/50 font-medium px-1 uppercase tracking-wider">Genres</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {getGenresForType(filters.eventType).map(genre => (
-                                            <button
-                                                key={genre}
-                                                onClick={() => updateFilter("eventGenre", filters.eventGenre === genre ? "" : genre)}
-                                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-tight border transition-colors ${filters.eventGenre === genre
-                                                    ? "bg-indigo-600 border-indigo-500 text-white"
-                                                    : "bg-white/5 text-white/60 border-white/5 hover:border-white/10"
-                                                    }`}
-                                            >
-                                                {genre}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+                {/* 4. CUISINES (Conditionally Rendered) */}
+                {selectedCats.some(c => ["Restaurant", "Café"].includes(c)) && (
+                    <div className="space-y-4 animate-in slide-in-from-left-2 duration-300">
+                        <label className="text-xs font-bold text-white/50 uppercase tracking-widest">Cuisine</label>
+                        <div className="flex flex-wrap gap-2">
+                            {(showAllCuisines ? TAXONOMY.CUISINES : TAXONOMY.CUISINES.slice(0, 10)).map(c => {
+                                const isSelected = getArray("cuisine").includes(c);
+                                return (
+                                    <button
+                                        key={c}
+                                        onClick={() => toggleArrayItem("cuisine", c)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 ${isSelected
+                                            ? "bg-orange-500/20 border-orange-500/50 text-orange-200"
+                                            : "bg-transparent border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                                            }`}
+                                    >
+                                        {c}
+                                    </button>
+                                )
+                            })}
+                            {TAXONOMY.CUISINES.length > 10 && !showAllCuisines && (
+                                <button onClick={() => setShowAllCuisines(true)} className="text-xs text-white/40 hover:text-white underline px-2">
+                                    + {TAXONOMY.CUISINES.length - 10} more
+                                </button>
+                            )}
+                            {showAllCuisines && (
+                                <button onClick={() => setShowAllCuisines(false)} className="text-xs text-white/40 hover:text-white underline px-2">
+                                    Show Less
+                                </button>
                             )}
                         </div>
-                    )}
-                </div>
-
-                <div className="h-px bg-white/5" />
-
-                {/* Ambiance */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("ambiance")}>
-                        <h3 className="font-semibold text-white">Ambiance</h3>
-                        {expandedSection === "ambiance" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
                     </div>
-                    {expandedSection === "ambiance" && (
-                        <div className="flex flex-wrap gap-2">
-                            {AMBIANCES.map(a => (
+                )}
+
+                {/* 5. VIBE & ATMOSPHERE */}
+                <div className="space-y-4">
+                    <label className="text-xs font-bold text-white/50 uppercase tracking-widest">Vibe & Atmosphere</label>
+                    <div className="flex flex-wrap gap-2">
+                        {TAXONOMY.VIBES.map(a => {
+                            const isSelected = getArray("ambiance").includes(a);
+                            return (
                                 <button
                                     key={a}
-                                    onClick={() => updateFilter("ambiance", filters.ambiance === a ? "" : a)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${filters.ambiance === a
-                                        ? "bg-indigo-600 text-white"
-                                        : "bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-zinc-600"
+                                    onClick={() => toggleArrayItem("ambiance", a)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 ${isSelected
+                                        ? "bg-purple-500/20 border-purple-500/50 text-purple-200"
+                                        : "bg-transparent border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
                                         }`}
                                 >
                                     {a}
                                 </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="h-px bg-white/5" />
-
-                {/* Cuisine */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("cuisine")}>
-                        <h3 className="font-semibold text-white">Cuisine / Food</h3>
-                        {expandedSection === "cuisine" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
+                            )
+                        })}
                     </div>
-                    {expandedSection === "cuisine" && (
-                        <div className="flex flex-wrap gap-2">
-                            {CUISINES.map(c => (
-                                <button
-                                    key={c}
-                                    onClick={() => updateFilter("cuisine", filters.cuisine === c ? "" : c)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${filters.cuisine === c
-                                        ? "bg-indigo-600 text-white"
-                                        : "bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-zinc-600"
-                                        }`}
-                                >
-                                    {c}
-                                </button>
-                            ))}
+                </div>
+
+                {/* 6. MUSIC (Conditionally Rendered) */}
+                {(selectedCats.length === 0 || selectedCats.some(c => {
+                    const l = c.toLowerCase();
+                    return l.includes("nightlife") || l.includes("club") || l.includes("event");
+                })) && (
+                        <div className="space-y-4 animate-in slide-in-from-left-2 duration-300">
+                            <label className="text-xs font-bold text-white/50 uppercase tracking-widest">Music</label>
+                            <div className="flex flex-wrap gap-2">
+                                {TAXONOMY.MUSIC_TYPES.slice(0, 15).map(m => {
+                                    const isSelected = getArray("musicStyle").includes(m);
+                                    return (
+                                        <button
+                                            key={m}
+                                            onClick={() => toggleArrayItem("musicStyle", m)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 ${isSelected
+                                                ? "bg-blue-500/20 border-blue-500/50 text-blue-200"
+                                                : "bg-transparent border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                                                }`}
+                                        >
+                                            {m}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                {/* 7. POLICIES & FACILITIES (Collapsible) */}
+                <div className="pt-4 border-t border-white/5">
+                    <button
+                        onClick={() => setFeaturesOpen(!featuresOpen)}
+                        className="w-full flex items-center justify-between text-left group py-2"
+                    >
+                        <label className="text-xs font-bold text-white/50 uppercase tracking-widest cursor-pointer group-hover:text-white/70 transition-colors">
+                            Policies & Facilities
+                        </label>
+                        {featuresOpen ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
+                    </button>
+
+                    {featuresOpen && (
+                        <div className="grid grid-cols-2 gap-3 mt-4 animate-in slide-in-from-top-2 duration-200">
+                            {[...TAXONOMY.POLICIES, ...TAXONOMY.FACILITIES].map(({ label, code, categories }) => {
+                                // Dynamic Visibility Check
+                                const shouldShow = () => {
+                                    if (selectedCats.length === 0) return true; // Show all in discovery
+                                    if (!categories) return true; // Global item
+                                    // Check normalized intersection
+                                    const normalize = (s: string) => s.toLowerCase().trim().replace(/&/g, 'and').replace(/\s+/g, ' ');
+                                    return categories.some(cat =>
+                                        selectedCats.some(sel => normalize(sel) === normalize(cat))
+                                    );
+                                };
+
+                                if (!shouldShow()) return null;
+
+                                const isChecked = localFilters.features?.[code];
+                                return (
+                                    <label key={code} className="flex items-center gap-3 cursor-pointer group select-none">
+                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-200 flex-shrink-0 ${isChecked
+                                            ? "bg-indigo-600 border-indigo-600 shadow-md shadow-indigo-900/20"
+                                            : "border-white/10 bg-white/5 group-hover:border-white/30"
+                                            }`}>
+                                            {isChecked && <Check size={12} className="text-white" />}
+                                        </div>
+                                        <span className={`text-sm transition-colors ${isChecked ? "text-white" : "text-zinc-400 group-hover:text-zinc-300"}`}>{label}</span>
+                                    </label>
+                                )
+                            })}
                         </div>
                     )}
                 </div>
 
-                <div className="h-px bg-white/5" />
-
-                {/* Payment Methods */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("payment")}>
-                        <h3 className="font-semibold text-white">Payment Methods</h3>
-                        {expandedSection === "payment" ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
-                    </div>
-                    {expandedSection === "payment" && (
-                        <div className="flex flex-wrap gap-2">
-                            {PAYMENT_METHODS.map(method => (
-                                <button
-                                    key={method}
-                                    onClick={() => toggleArrayFilter("paymentMethods", method)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${filters.paymentMethods?.includes(method)
-                                        ? "bg-indigo-600/20 border-indigo-500/50 text-indigo-200"
-                                        : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600"
-                                        }`}
-                                >
-                                    {method}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
+                <div className="h-32" />
             </div>
 
             {/* Footer Actions */}
-            <div className="p-4 mt-auto">
+            <div className="p-4 border-t border-white/5 flex gap-3 bg-transparent z-20">
                 <button
-                    onClick={() => setFilters({
-                        city: "",
-                        category: "",
-                        ambiance: "",
-                        cuisine: "",
-                        eventType: "",
-                        eventGenre: "",
-                        date: "",
-                        startTime: "",
-                        sort: "recommended",
-                        features: {},
-                        dressCode: [],
-                        agePolicy: [],
-                        paymentMethods: [],
-                        openingDays: [],
-                        startHour: "",
-                        endHour: ""
-                    })}
-                    className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium transition-colors text-sm border border-white/10"
+                    onClick={clear}
+                    className="flex-1 py-3 rounded-xl border border-white/10 text-white text-sm font-bold hover:bg-white/5 transition-all active:scale-[0.98]"
                 >
-                    Reset Filters
+                    Reset All
+                </button>
+                <button
+                    onClick={apply}
+                    className="flex-[2] py-3 rounded-xl bg-white text-black text-sm font-bold hover:bg-zinc-200 transition-all shadow-lg shadow-white/5 active:scale-[0.98]"
+                >
+                    Show Results
                 </button>
             </div>
         </div>

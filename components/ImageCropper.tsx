@@ -9,9 +9,10 @@ interface ImageCropperProps {
     imageSrc: string;
     onCancel: () => void;
     onCropComplete: (croppedAreaPixels: any) => void;
+    aspect?: number;
 }
 
-export default function ImageCropper({ imageSrc, onCancel, onCropComplete }: ImageCropperProps) {
+export default function ImageCropper({ imageSrc, onCancel, onCropComplete, aspect = 4 / 3 }: ImageCropperProps) {
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
@@ -37,7 +38,7 @@ export default function ImageCropper({ imageSrc, onCancel, onCropComplete }: Ima
             <div className="bg-zinc-900 rounded-2xl overflow-hidden w-full max-w-2xl flex flex-col h-[80vh]">
                 <div className="p-4 flex justify-between items-center border-b border-white/10 bg-zinc-900 z-10">
                     <h3 className="text-lg font-bold text-white">Adjust Image</h3>
-                    <button onClick={onCancel} className="p-2 hover:bg-white/10 rounded-full text-white">
+                    <button type="button" onClick={onCancel} className="p-2 hover:bg-white/10 rounded-full text-white">
                         <X size={20} />
                     </button>
                 </div>
@@ -47,7 +48,7 @@ export default function ImageCropper({ imageSrc, onCancel, onCropComplete }: Ima
                         image={imageSrc}
                         crop={crop}
                         zoom={zoom}
-                        aspect={4 / 3} // Default aspect, maybe make dynamic later
+                        aspect={aspect}
                         onCropChange={onCropChange}
                         onZoomChange={onZoomChange}
                         onCropComplete={onCropCompleteHandler}
@@ -71,12 +72,14 @@ export default function ImageCropper({ imageSrc, onCancel, onCropComplete }: Ima
 
                     <div className="flex justify-end gap-3">
                         <button
+                            type="button" // Prevent form submission
                             onClick={onCancel}
                             className="px-4 py-2 rounded-xl text-white/70 hover:bg-white/5 hover:text-white transition-colors"
                         >
                             Cancel
                         </button>
                         <button
+                            type="button" // Prevent form submission
                             onClick={handleSave}
                             className="px-6 py-2 rounded-xl bg-white text-black font-semibold hover:bg-zinc-200 transition-colors flex items-center gap-2"
                         >

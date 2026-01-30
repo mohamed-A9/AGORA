@@ -1,0 +1,81 @@
+// AUTO-SAVE IMPLEMENTATION FOR BASICSSTEP
+// Replace the existing onChange handlers with debounced auto-save
+
+import { useState, useEffect, useCallback } from "react";
+import { useDebounce } from "@/hooks/useDebounce"; // You'll need to create this hook
+
+// Add this state at the top of BasicsStep component
+const [autoSaving, setAutoSaving] = useState(false);
+
+// Debounced auto-save function
+const debouncedAutoSave = useCallback(
+    debounce(async (venueId: string, fieldName: string, value: any) => {
+        if (!venueId) return;
+        
+        setAutoSaving(true);
+        console.log(`💾 Auto-saving ${fieldName}:`, value);
+        
+        try {
+            await updateVenueStep(venueId, {
+                [fieldName]: value
+            });
+            console.log(`✅ ${fieldName} saved`);
+        } catch (err) {
+            console.error(`❌ Failed to auto-save ${fieldName}:`, err);
+        } finally {
+            setAutoSaving(false);
+        }
+    }, 1000), // Wait 1 second after user stops typing
+    []
+);
+
+// Example: Auto-save venue name on change
+<input
+    name="name"
+    defaultValue={initialData?.name || ""}
+    onChange={(e) => {
+        onDataChange({ name: e.target.value });
+        
+        // Get venueId from props or state
+        const currentVenueId = initialData?.id || venueId;
+        if (currentVenueId) {
+            debouncedAutoSave(currentVenueId, 'name', e.target.value);
+        }
+    }}
+    required
+    placeholder="Venue Name"
+    className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 focus:border-transparent outline-none transition-all"
+/>
+
+// Show auto-save indicator
+{autoSaving && (
+    <div className="fixed top-4 right-4 bg-zinc-800 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        <span>Saving...</span>
+    </div>
+)}
+
+// =================
+// DEBOUNCE HOOK
+// =================
+// Create: hooks/useDebounce.ts
+
+export function debounce<T extends (...args: any[]) => any>(
+    func: T,
+    wait: number
+): (...args: Parameters<T>) => void {
+    let timeout: NodeJS.Timeout | null = null;
+    
+    return function executedFunction(...args: Parameters<T>) {
+        const later = () => {
+            timeout = null;
+            func(...args);
+        };
+        
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+        
+        timeout = setTimeout(later, wait);
+    };
+}

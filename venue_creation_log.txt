@@ -1,0 +1,81 @@
+
+[2026-01-29T14:50:29.349Z] Attempt: Name="TEST", Cat="RESTAURANT"
+[2026-01-29T14:50:29.349Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+
+[2026-01-29T14:56:11.887Z] Attempt: Name="KICK OFF", Cat="NIGHTLIFE_BARS"
+[2026-01-29T14:56:11.887Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+
+[2026-01-29T15:12:19.040Z] Attempt: Name="test", Cat="RESTAURANT"
+[2026-01-29T15:12:19.040Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-29T15:12:19.040Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=test)
+[2026-01-29T15:12:19.040Z] DB Check Result: None
+
+[2026-01-29T15:39:16.432Z] Attempt: Name="a", Cat="CAFE"
+[2026-01-29T15:39:16.432Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-29T15:39:16.432Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=a)
+[2026-01-29T15:39:16.432Z] DB Check Result: None
+[2026-01-29T15:39:16.432Z] About to create venue with Cat: CAFE, Slug: venue-43676
+[2026-01-29T15:39:16.432Z] ✅ SUCCESS: Created ID cmkzmdjqn0007ta0o96fq8bn4
+
+[2026-01-29T16:14:08.528Z] Attempt: Name="gfyhn,gdh", Cat="CAFE"
+[2026-01-29T16:14:08.528Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-29T16:14:08.528Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=gfyhn,gdh)
+[2026-01-29T16:14:08.528Z] DB Check Result: None
+[2026-01-29T16:14:08.528Z] About to create venue with Cat: CAFE, Slug: gfyhn-gdh-45307
+[2026-01-29T16:14:08.528Z] ✅ SUCCESS: Created ID cmkznmdzn000bta0otnddbnk0
+
+[2026-01-29T16:21:16.888Z] Attempt: Name="Kick OFF", Cat="NIGHTLIFE_BARS"
+[2026-01-29T16:21:16.888Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-29T16:21:16.888Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=Kick OFF)
+[2026-01-29T16:21:16.888Z] DB Check Result: None
+[2026-01-29T16:21:16.888Z] About to create venue with Cat: NIGHTLIFE_BARS, Slug: kick-off-85394
+[2026-01-29T16:21:16.888Z] ✅ SUCCESS: Created ID cmkznvl9s000fta0oh11a76c5
+
+[2026-01-30T07:31:43.110Z] Attempt: Name="TEST", Cat="CAFE"
+[2026-01-30T07:31:43.110Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-30T07:31:43.110Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=TEST)
+[2026-01-30T07:31:43.110Z] DB Check Result: None
+[2026-01-30T07:31:43.110Z] About to create venue with Cat: CAFE, Slug: test-12733
+[2026-01-30T07:31:43.110Z] ✅ SUCCESS: Created ID cml0keedl000sta0o4j8ql0wk
+
+[2026-01-30T07:39:46.388Z] Attempt: Name="test", Cat="RESTAURANT"
+[2026-01-30T07:39:46.388Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-30T07:39:46.388Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=test)
+[2026-01-30T07:39:46.388Z] DB Check Result: None
+[2026-01-30T07:39:46.388Z] About to create venue with Cat: RESTAURANT, Slug: test-16758
+[2026-01-30T07:39:46.388Z] ✅ SUCCESS: Created ID cml0korai000wta0ou0v37pi4
+
+[2026-01-30T07:41:57.929Z] Attempt: Name="ttt", Cat="RESTAURANT"
+[2026-01-30T07:41:57.929Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-30T07:41:57.929Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=ttt)
+[2026-01-30T07:41:57.929Z] DB Check Result: None
+[2026-01-30T07:41:57.929Z] About to create venue with Cat: RESTAURANT, Slug: ttt-41231
+[2026-01-30T07:41:57.929Z] ✅ SUCCESS: Created ID cml0krks40010ta0op3k37ei6
+
+[2026-01-30T07:49:34.658Z] Attempt: Name="tttt", Cat="CAFE"
+[2026-01-30T07:49:34.658Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-30T07:49:34.658Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=tttt)
+[2026-01-30T07:49:34.658Z] DB Check Result: None
+[2026-01-30T07:49:34.658Z] About to create venue with Cat: CAFE, Slug: tttt-33903
+[2026-01-30T07:49:34.658Z] ✅ SUCCESS: Created ID cml0l1d9n0014ta0o9zxrdmpz
+
+[2026-01-30T07:50:41.098Z] Attempt: Name="test", Cat="NIGHTLIFE_BARS"
+[2026-01-30T07:50:41.098Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-30T07:50:41.098Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=test)
+[2026-01-30T07:50:41.098Z] DB Check Result: None
+[2026-01-30T07:50:41.098Z] About to create venue with Cat: NIGHTLIFE_BARS, Slug: test-94187
+[2026-01-30T07:50:41.098Z] ✅ SUCCESS: Created ID cml0l2sgo0018ta0ozb8623mj
+
+[2026-01-30T07:53:27.619Z] Attempt: Name="ttt", Cat="CAFE"
+[2026-01-30T07:53:27.619Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-30T07:53:27.619Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=ttt)
+[2026-01-30T07:53:27.619Z] DB Check Result: None
+[2026-01-30T07:53:27.619Z] About to create venue with Cat: CAFE, Slug: ttt-47018
+[2026-01-30T07:53:27.619Z] ✅ SUCCESS: Created ID cml0l6cx1001cta0ow1zf10y8
+
+[2026-01-30T09:20:40.950Z] Attempt: Name="[TEST]", Cat="CAFE"
+[2026-01-30T09:20:40.950Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-30T09:20:40.950Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=[TEST])
+[2026-01-30T09:20:40.950Z] DB Check Result: None
+[2026-01-30T09:20:40.950Z] About to create venue with Cat: CAFE, Slug: test-55740
+[2026-01-30T09:20:40.950Z] ✅ SUCCESS: Created ID cml0oaj060001taocarcvjqwq

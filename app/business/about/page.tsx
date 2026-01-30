@@ -115,7 +115,7 @@ export default function BusinessAboutPage() {
                     {features.map((feature, idx) => (
                         <div
                             key={idx}
-                            className="p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/5 backdrop-blur-xl hover:bg-zinc-900/80 transition-all hover:border-white/10 group"
+                            className="p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/5 backdrop-blur-xl hover:bg-zinc-900/80 transition-all hover:border-white/10 group flex flex-col items-center text-center"
                         >
                             <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-8 group-hover:scale-110 group-hover:bg-indigo-500/20 transition-all">
                                 <feature.icon className="w-7 h-7 text-indigo-400" />

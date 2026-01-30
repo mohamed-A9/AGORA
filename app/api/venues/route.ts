@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
   // Build Where Clause
   const where: any = {
-    status: { in: ["APPROVED", "PENDING"] },
+    status: "APPROVED",
   };
 
   // 1. Text Search

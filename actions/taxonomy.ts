@@ -3,29 +3,42 @@
 import { prisma } from "@/lib/prisma";
 
 export async function getVenueTypes(lang: "en" | "fr" | "ar" = "en") {
-    const types = await prisma.venueType.findMany({
-        where: { is_active: true },
-        orderBy: { category_name_en: 'asc' }
+    // Legacy: This function used to query a "VenueType" table.
+    // Now we query the standard Subcategory table.
+    // We group by MainCategory.
+
+    // @ts-ignore
+    const subcats = await (prisma as any).subcategory.findMany({
+        orderBy: { name: 'asc' }
     });
 
-    // Group by category
-    const grouped = types.reduce((acc: Record<string, any>, type: any) => {
-        const catCode = type.category_code;
-        if (!acc[catCode]) {
-            acc[catCode] = {
+    // Group by MainCategory
+    // Since we don't have separate localized names in the new simple schema (yet),
+    // we use "name" for all languages or add a map if needed.
+    // The previous implementation returned a grouped structure.
+
+    const grouped: Record<string, any> = {};
+
+    for (const sc of subcats) {
+        // Use MainCategory as code
+        const catCode = sc.mainCategory;
+
+        if (!grouped[catCode]) {
+            // Need a label for the MainCategory. We can use TAXONOMY constants or just title case the Enum.
+            grouped[catCode] = {
                 code: catCode,
-                name: lang === "fr" ? type.category_name_fr : lang === "ar" ? type.category_name_ar : type.category_name_en,
+                name: catCode.replace(/_/g, " "), // Simple formatting
                 subcategories: []
             };
         }
-        acc[catCode].subcategories.push({
-            id: type.id,
-            code: type.subcategory_code,
-            name: lang === "fr" ? type.subcategory_name_fr : lang === "ar" ? type.subcategory_name_ar : type.subcategory_name_en,
-            icon: type.icon
+
+        grouped[catCode].subcategories.push({
+            id: sc.id,
+            code: sc.slug, // Use slug as code
+            name: sc.name,
+            icon: "" // No icon in new schema yet
         });
-        return acc;
-    }, {} as Record<string, any>);
+    }
 
     return Object.values(grouped);
 }

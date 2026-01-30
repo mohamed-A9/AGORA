@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { updateVenueStep } from "@/actions/venue";
-import { moroccanCities, TIME_SLOTS } from "@/lib/constants";
+import { moroccanCities, CITY_NEIGHBORHOODS } from "@/lib/constants";
+import TimePicker from "@/components/ui/TimePicker";
 
 // Helper for days
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export default function LocationStep({ venueId, onNext, onBack, initialData }: { venueId: string, onNext: (data: any) => void, onBack: () => void, initialData?: any }) {
+export default function LocationStep({ venueId, onNext, onBack, initialData, onDataChange }: { venueId: string, onNext: (data: any) => void, onBack: () => void, initialData?: any, onDataChange: (data: any) => void }) {
     const [isLoading, setIsLoading] = useState(false);
 
     // Address State
@@ -59,9 +60,22 @@ export default function LocationStep({ venueId, onNext, onBack, initialData }: {
         });
 
         if (res?.success) {
-            onNext({ address, city, openingHours: formattedHours });
+            onNext({
+                address,
+                city,
+                neighborhood,
+                locationUrl: googleUrl,
+                openingHours: formattedHours,
+                weeklySchedule: scheduleRows
+            });
         } else {
-            alert(res?.error || "Failed to save location.");
+            if (res?.error === "DRAFT_NOT_FOUND") {
+                alert("This venue draft no longer exists in our database. We'll refresh the page so you can start fresh.");
+                localStorage.clear();
+                window.location.href = "/business/add-venue";
+            } else {
+                alert(res?.error || "Failed to save location.");
+            }
         }
         setIsLoading(false);
     }
@@ -84,7 +98,26 @@ export default function LocationStep({ venueId, onNext, onBack, initialData }: {
                 </div>
                 <div className="space-y-2">
                     <label className="text-sm text-zinc-400">Neighborhood</label>
-                    <input value={neighborhood} onChange={e => setNeighborhood(e.target.value)} placeholder="e.g. Gueliz, Maarif" className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white" />
+                    {city && CITY_NEIGHBORHOODS[city] ? (
+                        <select
+                            value={neighborhood}
+                            onChange={e => setNeighborhood(e.target.value)}
+                            className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white"
+                        >
+                            <option value="">Select Neighborhood...</option>
+                            {CITY_NEIGHBORHOODS[city].map(n => (
+                                <option key={n} value={n}>{n}</option>
+                            ))}
+                            <option value="Other">Other</option>
+                        </select>
+                    ) : (
+                        <input
+                            value={neighborhood}
+                            onChange={e => setNeighborhood(e.target.value)}
+                            placeholder="e.g. Gueliz, Maarif"
+                            className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white"
+                        />
+                    )}
                 </div>
                 <div className="col-span-1 md:col-span-2 space-y-2">
                     <label className="text-sm text-zinc-400">Full Address <span className="text-red-500">*</span></label>
@@ -123,63 +156,17 @@ export default function LocationStep({ venueId, onNext, onBack, initialData }: {
 
                             <div className="hidden md:block w-px h-6 bg-white/10"></div>
 
-                            <div className="flex items-center gap-1.5 flex-1">
-                                <span className="text-sm text-zinc-500">Open</span>
-                                <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded px-2 py-1">
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        maxLength={2}
-                                        value={row.open.split(':')[0]}
-                                        onChange={e => {
-                                            const val = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                            updateRow(idx, 'open', `${val.padStart(2, '0')}:${row.open.split(':')[1] || '00'}`);
-                                        }}
-                                        className="w-8 bg-transparent text-sm text-white text-center outline-none"
-                                        placeholder="HH"
-                                    />
-                                    <span className="text-zinc-500">:</span>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        maxLength={2}
-                                        value={row.open.split(':')[1]}
-                                        onChange={e => {
-                                            const val = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                            updateRow(idx, 'open', `${row.open.split(':')[0] || '00'}:${val.padStart(2, '0')}`);
-                                        }}
-                                        className="w-8 bg-transparent text-sm text-white text-center outline-none"
-                                        placeholder="mm"
-                                    />
-                                </div>
-                                <span className="text-sm text-zinc-500 ml-1">Close</span>
-                                <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded px-2 py-1">
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        maxLength={2}
-                                        value={row.close.split(':')[0]}
-                                        onChange={e => {
-                                            const val = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                            updateRow(idx, 'close', `${val.padStart(2, '0')}:${row.close.split(':')[1] || '00'}`);
-                                        }}
-                                        className="w-8 bg-transparent text-sm text-white text-center outline-none"
-                                        placeholder="HH"
-                                    />
-                                    <span className="text-zinc-500">:</span>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        maxLength={2}
-                                        value={row.close.split(':')[1]}
-                                        onChange={e => {
-                                            const val = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                            updateRow(idx, 'close', `${row.close.split(':')[0] || '00'}:${val.padStart(2, '0')}`);
-                                        }}
-                                        className="w-8 bg-transparent text-sm text-white text-center outline-none"
-                                        placeholder="mm"
-                                    />
-                                </div>
+                            <div className="flex items-center gap-4 flex-1">
+                                <TimePicker
+                                    label="Open"
+                                    value={row.open}
+                                    onChange={(val) => updateRow(idx, 'open', val)}
+                                />
+                                <TimePicker
+                                    label="Close"
+                                    value={row.close}
+                                    onChange={(val) => updateRow(idx, 'close', val)}
+                                />
                             </div>
 
                             {scheduleRows.length > 1 && (

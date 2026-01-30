@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import TimePicker from "@/components/ui/TimePicker";
 import { useParams, useRouter } from "next/navigation";
 import { updateVenue } from "@/actions/venue-management";
 import { createEvent, deleteEvent } from "@/actions/event";
 import MediaUpload from "@/components/MediaUpload";
-import { AMBIANCES, CUISINES, PAYMENT_METHODS, DRESS_CODES, AGE_POLICIES, TIME_SLOTS, MUSIC_STYLES, CATEGORY_SUBCATEGORIES, CATEGORY_SPECIALIZATIONS } from "@/lib/constants";
+import { AMBIANCES, CUISINES, PAYMENT_METHODS, DRESS_CODES, AGE_POLICIES, TIME_SLOTS, MUSIC_STYLES, CATEGORY_SUBCATEGORIES, CATEGORY_SPECIALIZATIONS, CITY_NEIGHBORHOODS } from "@/lib/constants";
 import { EVENT_TYPES, getGenresForType } from "@/lib/event-taxonomy";
+import { getVenueTypes } from "@/actions/taxonomy";
+import { getVenueTypeFields } from "@/actions/dynamic-fields";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 import { LayoutDashboard, MapPin, FileText, Camera, Clock, CheckCircle, Calendar, Trash } from "lucide-react";
@@ -24,23 +27,158 @@ export default function EditVenuePage() {
     const [events, setEvents] = useState<any[]>([]);
     const [eventMedia, setEventMedia] = useState<any[]>([]);
     const [selectedEventType, setSelectedEventType] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState(""); // Initialize with empty string, will be set by loadData
     const [saveStatus, setSaveStatus] = useState("");
 
-    async function loadData() {
-        const res = await fetch(`/api/venues/${id}`, { cache: "no-store" });
-        const data = await res.json();
-        if (data.venue) {
-            setFormData(data.venue);
-            setMedia(data.venue.media || []);
-            setEvents(data.venue.events || []);
+    // Dynamic Taxonomy State
+    const [taxonomy, setTaxonomy] = useState<any[]>([]);
+    const [subcategories, setSubcategories] = useState<any[]>([]);
+    const [specializationOptions, setSpecializationOptions] = useState<any[]>([]);
+    const [dynamicFields, setDynamicFields] = useState<any[]>([]); // New state for all fields
+
+    // Controlled Inputs for immediate UI reaction
+    const [selectedCategory, setSelectedCategory] = useState("");
+    const [selectedSubcategory, setSelectedSubcategory] = useState("");
+
+    // Load active tab from local storage on mount
+    useEffect(() => {
+        if (id) {
+            const savedTab = localStorage.getItem(`agora_edit_venue_tab_${id}`);
+            if (savedTab) {
+                setActiveTab(savedTab);
+            }
         }
-        setLoading(false);
+    }, [id]);
+
+    // Save active tab to local storage when it changes
+    useEffect(() => {
+        if (id && activeTab) {
+            localStorage.setItem(`agora_edit_venue_tab_${id}`, activeTab);
+        }
+    }, [id, activeTab]);
+
+    // Load Taxonomy on Mount
+    useEffect(() => {
+        getVenueTypes().then(data => {
+            setTaxonomy(data);
+        });
+    }, []);
+
+    async function loadData() {
+        try {
+            const res = await fetch(`/api/venues/${id}`, { cache: "no-store" });
+            if (!res.ok) throw new Error("Failed to load");
+            const data = await res.json();
+
+            if (data.venue) {
+                const v = data.venue;
+                const flatData = { ...v };
+
+                // Map Main Category
+                if (v.mainCategory) {
+                    flatData.category = v.mainCategory;
+                    setSelectedCategory(v.mainCategory);
+                }
+
+                // Map Subcategory (stored for later when taxonomy loads)
+                if (v.subcategories && v.subcategories.length > 0) {
+                    flatData.subcategory = v.subcategories[0].subcategory.name;
+                    // Don't set selectedSubcategory yet, wait for taxonomy to load
+                }
+
+                // Map Vibes/Cuisine
+                if (v.vibes?.[0]?.vibe) flatData.ambiance = v.vibes[0].vibe.name;
+                if (v.cuisines?.[0]?.cuisine) flatData.cuisine = v.cuisines[0].cuisine.name;
+
+                // Map Facilities
+                if (v.facilities) {
+                    flatData.parkingAvailable = v.facilities.some((f: any) => f.facility.code === "PARKING");
+                    flatData.valetParking = v.facilities.some((f: any) => f.facility.code === "VALET");
+                }
+
+                // Flatten City Object to Name
+                if (v.city && typeof v.city === 'object') {
+                    flatData.city = v.city.name;
+                }
+
+                setFormData(flatData);
+
+                // Map existing gallery to media state
+                if (v.gallery && Array.isArray(v.gallery)) {
+                    const mappedMedia = v.gallery
+                        .sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                        .map((m: any) => ({
+                            id: m.id,
+                            url: m.url,
+                            type: m.kind // DB uses 'kind', frontend uses 'type'
+                        }));
+                    setMedia(mappedMedia);
+                    console.log("Loaded gallery:", mappedMedia.length, "items");
+                } else {
+                    console.warn("No gallery found in venue data");
+                    setMedia([]);
+                }
+
+                setEvents(v.events || []);
+            }
+        } catch (e) {
+            console.error("Error loading venue data", e);
+        } finally {
+            setLoading(false);
+        }
     }
 
     useEffect(() => {
         loadData();
     }, [id]);
+
+    // Effect: Update Subcategories when Category changes OR taxonomy loads
+    useEffect(() => {
+        if (!selectedCategory || taxonomy.length === 0) {
+            setSubcategories([]);
+            return;
+        }
+        const cat = taxonomy.find(c => c.code === selectedCategory);
+        const subs = cat ? cat.subcategories : [];
+        setSubcategories(subs);
+
+        // After taxonomy loads and subcategories are set, restore the selected subcategory from formData
+        if (formData.subcategory && subs.length > 0) {
+            setSelectedSubcategory(formData.subcategory);
+        }
+    }, [selectedCategory, taxonomy, formData.subcategory]);
+
+    // Effect: Update Specialization Options AND Dynamic Fields when Subcategory changes
+    useEffect(() => {
+        if (!selectedSubcategory) {
+            setSpecializationOptions([]);
+            setDynamicFields([]);
+            return;
+        }
+
+        getVenueTypeFields(selectedSubcategory).then(fields => {
+            setDynamicFields(fields); // Store all fields for other tabs
+
+            const specFieldKey = ['activity_type', 'cuisine_types', 'music_genres', 'ambiance'].find(key =>
+                fields.some((f: any) => f.field_key === key)
+            );
+
+            const specField = specFieldKey
+                ? fields.find((f: any) => f.field_key === specFieldKey)
+                : null;
+
+            if (specField && specField.options && Array.isArray(specField.options)) {
+                setSpecializationOptions(specField.options as any[]);
+            } else {
+                setSpecializationOptions([]);
+            }
+        });
+    }, [selectedSubcategory]);
+
+    // Helper to get options for a specific field key
+    function getOptionsFor(fieldKey: string) {
+        const field = dynamicFields.find(f => f.field_key === fieldKey);
+        return field && field.options && Array.isArray(field.options) ? field.options : [];
+    }
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
@@ -54,19 +192,42 @@ export default function EditVenuePage() {
         if (res.success && res.venue) {
             setSaveStatus("Saved!");
 
-            setTimeout(() => setSaveStatus(""), 5000);
-
+            // Update local state directly with authoritative server data
             // Update local state directly with authoritative server data
             setFormData(res.venue);
-            setMedia(res.venue.media || []);
-            // setEvents(res.venue.events || []); // Events not returned in this query usually?
 
-            // Do NOT call loadData() to avoid race conditions with replication lag
+            // Re-map media on save success properties (gallery -> media)
+            if ((res.venue as any).gallery) {
+                const mapped = (res.venue as any).gallery.map((m: any) => ({
+                    id: m.id,
+                    url: m.url,
+                    type: m.kind
+                }));
+                setMedia(mapped);
+            } else if ((res.venue as any).media) {
+                setMedia((res.venue as any).media);
+            }
+
+            router.refresh();
+
+            // Redirect after short delay
+            setTimeout(() => {
+                console.log("Redirecting to venue page...");
+                router.push(`/venue/${id}`);
+            }, 1000);
+
         } else {
             alert(res.error || "Error updating");
             setSaveStatus("Error");
         }
     }
+
+    // Prevent implicit submission on Enter
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") {
+            e.preventDefault();
+        }
+    };
 
     async function handleAddEvent(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
@@ -119,7 +280,7 @@ export default function EditVenuePage() {
                             {saveStatus}
                         </span>
                     )}
-                    <Link href="/business/my-venues" className="px-4 py-2 text-white/60 hover:text-white">Cancel</Link>
+                    <Link href={`/venue/${id}`} className="px-4 py-2 text-white/60 hover:text-white">Cancel</Link>
                     <button form="edit-form" type="submit" disabled={saveStatus === "Saving..."} className="bg-white text-black font-bold px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-50">
                         {saveStatus === "Saving..." ? "Saving..." : "Save Changes"}
                     </button>
@@ -148,7 +309,7 @@ export default function EditVenuePage() {
                 <div className="flex-1 bg-zinc-900 border border-white/10 rounded-2xl p-6 md:p-8">
                     {/* Main Form for everything EXCEPT Events */}
                     {activeTab !== "events" && (
-                        <form id="edit-form" onSubmit={handleSubmit} className="space-y-6">
+                        <form id="edit-form" onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-6">
 
                             {/* BASICS */}
                             <div className={activeTab === "basics" ? "space-y-6" : "hidden"}>
@@ -164,37 +325,40 @@ export default function EditVenuePage() {
                                     <label className="text-sm text-zinc-400">Category</label>
                                     <select
                                         name="category"
-                                        defaultValue={formData.category}
+                                        value={selectedCategory}
                                         className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none"
-                                        onChange={(e) => setSelectedCategory(e.target.value)}
+                                        onChange={(e) => {
+                                            setSelectedCategory(e.target.value);
+                                            setSelectedSubcategory(""); // Reset
+                                        }}
                                     >
-                                        <option value="restaurants">Restaurants & Cafés</option>
-                                        <option value="nightlife">Nightlife & Bars</option>
-                                        <option value="clubs">Clubs & Party</option>
-                                        <option value="culture">Culture & Arts</option>
-                                        <option value="events">Events & Live</option>
+                                        <option value="">Select Category...</option>
+                                        {taxonomy.map(cat => (
+                                            <option key={cat.code} value={cat.code}>{cat.name}</option>
+                                        ))}
                                     </select>
                                 </div>
 
-                                {/* Conditional Subcategory */}
-                                {selectedCategory && CATEGORY_SUBCATEGORIES[selectedCategory] && (
+                                {/* Dynamic Subcategory */}
+                                {subcategories.length > 0 && (
                                     <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                                         <label className="text-sm text-zinc-400">Subcategory (Optional)</label>
                                         <select
                                             name="subcategory"
-                                            defaultValue={formData.subcategory || ""}
+                                            value={selectedSubcategory}
+                                            onChange={(e) => setSelectedSubcategory(e.target.value)}
                                             className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none"
                                         >
                                             <option value="">Select a subcategory...</option>
-                                            {CATEGORY_SUBCATEGORIES[selectedCategory].map(sub => (
-                                                <option key={sub} value={sub}>{sub}</option>
+                                            {subcategories.map(sub => (
+                                                <option key={sub.code} value={sub.code}>{sub.name}</option>
                                             ))}
                                         </select>
                                     </div>
                                 )}
 
-                                {/* Conditional Specialization (Third Level) */}
-                                {selectedCategory && CATEGORY_SPECIALIZATIONS[selectedCategory] && (
+                                {/* Dynamic Specialization */}
+                                {specializationOptions.length > 0 && (
                                     <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                                         <label className="text-sm text-zinc-400">Specialization (Optional)</label>
                                         <select
@@ -202,15 +366,9 @@ export default function EditVenuePage() {
                                             defaultValue={formData.specialization || ""}
                                             className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none"
                                         >
-                                            <option value="">
-                                                {selectedCategory === 'restaurants' ? 'Select cuisine type...' :
-                                                    selectedCategory === 'nightlife' ? 'Select drink specialty...' :
-                                                        selectedCategory === 'clubs' ? 'Select music genre...' :
-                                                            selectedCategory === 'culture' ? 'Select art type...' :
-                                                                'Select specialization...'}
-                                            </option>
-                                            {CATEGORY_SPECIALIZATIONS[selectedCategory].map(spec => (
-                                                <option key={spec} value={spec}>{spec}</option>
+                                            <option value="">Select specialization...</option>
+                                            {specializationOptions.map((opt: any) => (
+                                                <option key={opt.value} value={opt.value}>{opt.label_en || opt.value}</option>
                                             ))}
                                         </select>
                                     </div>
@@ -234,7 +392,21 @@ export default function EditVenuePage() {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm text-zinc-400">Neighborhood</label>
-                                        <input name="neighborhood" defaultValue={formData.neighborhood} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                        {formData.city && CITY_NEIGHBORHOODS[formData.city] ? (
+                                            <select
+                                                name="neighborhood"
+                                                defaultValue={formData.neighborhood}
+                                                className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none"
+                                            >
+                                                <option value="">Select Neighborhood...</option>
+                                                {CITY_NEIGHBORHOODS[formData.city].map(n => (
+                                                    <option key={n} value={n}>{n}</option>
+                                                ))}
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        ) : (
+                                            <input name="neighborhood" defaultValue={formData.neighborhood} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                        )}
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -245,7 +417,7 @@ export default function EditVenuePage() {
 
                             {/* OPERATIONS */}
                             <div className={activeTab === "operations" ? "space-y-6" : "hidden"}>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-sm text-zinc-400">Phone</label>
                                         <input name="phone" defaultValue={formData.phone} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
@@ -254,7 +426,31 @@ export default function EditVenuePage() {
                                         <label className="text-sm text-zinc-400">Website</label>
                                         <input name="website" defaultValue={formData.website} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
                                     </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm text-zinc-400">Instagram</label>
+                                        <input name="instagram" defaultValue={formData.instagram} placeholder="@username" className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none" />
+                                    </div>
                                 </div>
+
+                                {/* Payment Methods */}
+                                <div className="space-y-3 pt-4 border-t border-white/5">
+                                    <label className="text-sm font-bold text-white uppercase tracking-wider">Payment Methods</label>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        {PAYMENT_METHODS.map(method => (
+                                            <label key={method} className="flex items-center gap-2 bg-white/5 p-3 rounded-lg cursor-pointer hover:bg-white/10 transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    name="paymentMethods"
+                                                    value={method}
+                                                    defaultChecked={formData.paymentMethods?.includes(method)}
+                                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
+                                                />
+                                                <span className="text-sm text-white">{method}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 {/* Opening Schedule */}
                                 <div className="space-y-4 pt-4 border-t border-white/5">
                                     <div className="flex justify-between items-center">
@@ -303,72 +499,26 @@ export default function EditVenuePage() {
 
                                                 <div className="hidden md:block w-px h-6 bg-white/10"></div>
 
-                                                <div className="flex items-center gap-1.5 flex-1">
-                                                    <span className="text-xs text-zinc-500">Ouvre</span>
-                                                    <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1.5">
-                                                        <input
-                                                            type="text"
-                                                            inputMode="numeric"
-                                                            maxLength={2}
-                                                            value={row.open?.split(':')[0] || '09'}
-                                                            onChange={e => {
-                                                                const val = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                                                const newS = [...formData.weeklySchedule];
-                                                                newS[idx].open = `${val.padStart(2, '0')}:${row.open?.split(':')[1] || '00'}`;
-                                                                setFormData({ ...formData, weeklySchedule: newS });
-                                                            }}
-                                                            className="w-6 bg-transparent text-xs text-white text-center outline-none"
-                                                            placeholder="HH"
-                                                        />
-                                                        <span className="text-zinc-500 text-xs">:</span>
-                                                        <input
-                                                            type="text"
-                                                            inputMode="numeric"
-                                                            maxLength={2}
-                                                            value={row.open?.split(':')[1] || '00'}
-                                                            onChange={e => {
-                                                                const val = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                                                const newS = [...formData.weeklySchedule];
-                                                                newS[idx].open = `${row.open?.split(':')[0] || '09'}:${val.padStart(2, '0')}`;
-                                                                setFormData({ ...formData, weeklySchedule: newS });
-                                                            }}
-                                                            className="w-6 bg-transparent text-xs text-white text-center outline-none"
-                                                            placeholder="mm"
-                                                        />
-                                                    </div>
+                                                <div className="flex items-center gap-4 flex-1">
+                                                    <TimePicker
+                                                        label="Open"
+                                                        value={row.open || "09:00"}
+                                                        onChange={(val: string) => {
+                                                            const newS = [...formData.weeklySchedule];
+                                                            newS[idx].open = val;
+                                                            setFormData({ ...formData, weeklySchedule: newS });
+                                                        }}
+                                                    />
 
-                                                    <span className="text-xs text-zinc-500 ml-1">Ferme</span>
-                                                    <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1.5">
-                                                        <input
-                                                            type="text"
-                                                            inputMode="numeric"
-                                                            maxLength={2}
-                                                            value={row.close?.split(':')[0] || '23'}
-                                                            onChange={e => {
-                                                                const val = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                                                const newS = [...formData.weeklySchedule];
-                                                                newS[idx].close = `${val.padStart(2, '0')}:${row.close?.split(':')[1] || '00'}`;
-                                                                setFormData({ ...formData, weeklySchedule: newS });
-                                                            }}
-                                                            className="w-6 bg-transparent text-xs text-white text-center outline-none"
-                                                            placeholder="HH"
-                                                        />
-                                                        <span className="text-zinc-500 text-xs">:</span>
-                                                        <input
-                                                            type="text"
-                                                            inputMode="numeric"
-                                                            maxLength={2}
-                                                            value={row.close?.split(':')[1] || '00'}
-                                                            onChange={e => {
-                                                                const val = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                                                const newS = [...formData.weeklySchedule];
-                                                                newS[idx].close = `${row.close?.split(':')[0] || '23'}:${val.padStart(2, '0')}`;
-                                                                setFormData({ ...formData, weeklySchedule: newS });
-                                                            }}
-                                                            className="w-6 bg-transparent text-xs text-white text-center outline-none"
-                                                            placeholder="mm"
-                                                        />
-                                                    </div>
+                                                    <TimePicker
+                                                        label="Close"
+                                                        value={row.close || "23:00"}
+                                                        onChange={(val: string) => {
+                                                            const newS = [...formData.weeklySchedule];
+                                                            newS[idx].close = val;
+                                                            setFormData({ ...formData, weeklySchedule: newS });
+                                                        }}
+                                                    />
                                                 </div>
 
                                                 {formData.weeklySchedule?.length > 1 && (
@@ -412,14 +562,18 @@ export default function EditVenuePage() {
                                         <label className="text-sm text-zinc-400">Ambiance</label>
                                         <select name="ambiance" defaultValue={formData.ambiance || ""} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
                                             <option value="">None</option>
-                                            {AMBIANCES.map(a => <option key={a} value={a}>{a}</option>)}
+                                            {(getOptionsFor('ambiance').length > 0 ? getOptionsFor('ambiance') : AMBIANCES.map(l => ({ value: l, label_en: l }))).map((opt: any) => (
+                                                <option key={opt.value} value={opt.value}>{opt.label_en || opt.value}</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm text-zinc-400">Cuisine / Primary Style</label>
                                         <select name="cuisine" defaultValue={formData.cuisine || ""} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
                                             <option value="">None</option>
-                                            {CUISINES.map(c => <option key={c} value={c}>{c}</option>)}
+                                            {(getOptionsFor('cuisine_types').length > 0 ? getOptionsFor('cuisine_types') : CUISINES.map(l => ({ value: l, label_en: l }))).map((opt: any) => (
+                                                <option key={opt.value} value={opt.value}>{opt.label_en || opt.value}</option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>
@@ -428,7 +582,9 @@ export default function EditVenuePage() {
                                         <label className="text-sm text-zinc-400">Dress Code</label>
                                         <select name="dressCode" defaultValue={formData.dressCode || ""} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
                                             <option value="">None</option>
-                                            {DRESS_CODES.map(d => <option key={d} value={d}>{d}</option>)}
+                                            {(getOptionsFor('dress_code').length > 0 ? getOptionsFor('dress_code') : DRESS_CODES.map(l => ({ value: l, label_en: l }))).map((opt: any) => (
+                                                <option key={opt.value} value={opt.value}>{opt.label_en || opt.value}</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div className="space-y-2">

@@ -1,0 +1,88 @@
+
+[2026-01-29T15:56:14.381Z] START Update: ID=cmkzmdjqn0007ta0o96fq8bn4
+[2026-01-29T15:56:14.381Z] Venue Found: a
+[2026-01-29T15:56:14.381Z] Ready to Update DB...
+
+[2026-01-29T16:14:09.679Z] START Update: ID=cmkznmdzn000bta0otnddbnk0
+[2026-01-29T16:14:09.679Z] Venue Found: gfyhn,gdh
+[2026-01-29T16:14:09.679Z] Ready to Update DB...
+
+[2026-01-29T16:21:18.327Z] START Update: ID=cmkznvl9s000fta0oh11a76c5
+[2026-01-29T16:21:18.327Z] Venue Found: Kick OFF
+[2026-01-29T16:21:18.327Z] Ready to Update DB...
+
+[2026-01-29T16:55:33.166Z] START Update: ID=cmkznvl9s000fta0oh11a76c5
+[2026-01-29T16:55:33.166Z] Venue Found: Kick OFF
+[2026-01-29T16:55:33.166Z] Ready to Update DB...
+
+[2026-01-30T07:31:43.617Z] START Update: ID=cml0keedl000sta0o4j8ql0wk
+[2026-01-30T07:31:43.617Z] Venue Found: TEST
+[2026-01-30T07:31:43.617Z] Ready to Update DB...
+
+[2026-01-30T07:39:46.863Z] START Update: ID=cml0korai000wta0ou0v37pi4
+[2026-01-30T07:39:46.863Z] Venue Found: test
+[2026-01-30T07:39:46.863Z] Ready to Update DB...
+
+[2026-01-30T07:42:06.408Z] START Update: ID=cml0krks40010ta0op3k37ei6
+[2026-01-30T07:42:06.408Z] Venue Found: ttt
+[2026-01-30T07:42:06.408Z] Ready to Update DB...
+
+[2026-01-30T07:49:35.207Z] START Update: ID=cml0l1d9n0014ta0o9zxrdmpz
+[2026-01-30T07:49:35.207Z] Venue Found: tttt
+[2026-01-30T07:49:35.207Z] Ready to Update DB...
+
+[2026-01-30T07:50:41.482Z] START Update: ID=cml0l2sgo0018ta0ozb8623mj
+[2026-01-30T07:50:41.482Z] Venue Found: test
+[2026-01-30T07:50:41.482Z] Ready to Update DB...
+
+[2026-01-30T07:53:27.899Z] START Update: ID=cml0l6cx1001cta0ow1zf10y8
+[2026-01-30T07:53:27.899Z] Venue Found: ttt
+[2026-01-30T07:53:27.899Z] Ready to Update DB...
+
+[2026-01-30T09:20:41.421Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T09:20:41.421Z] Venue Found: [TEST]
+[2026-01-30T09:20:41.421Z] Ready to Update DB...
+
+[2026-01-30T09:29:17.000Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T09:29:17.000Z] Venue Found: [TEST]
+[2026-01-30T09:29:17.000Z] Ready to Update DB...
+
+[2026-01-30T09:38:36.978Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T09:38:36.978Z] Venue Found: [TEST]
+[2026-01-30T09:38:36.978Z] Ready to Update DB...
+
+[2026-01-30T10:37:34.740Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T10:37:34.740Z] Venue Found: [TEST]
+[2026-01-30T10:37:34.740Z] Ready to Update DB...
+
+[2026-01-30T10:42:40.917Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T10:42:40.917Z] Venue Found: [TEST]
+[2026-01-30T10:42:40.917Z] Ready to Update DB...
+
+[2026-01-30T10:49:31.301Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T10:49:31.301Z] Venue Found: [TEST]
+[2026-01-30T10:49:31.301Z] Ready to Update DB...
+
+[2026-01-30T10:50:10.994Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T10:50:10.994Z] Venue Found: [TEST]
+[2026-01-30T10:50:10.994Z] Ready to Update DB...
+
+[2026-01-30T11:00:34.854Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T11:00:34.854Z] Venue Found: [TEST]
+[2026-01-30T11:00:34.854Z] Ready to Update DB...
+
+[2026-01-30T13:47:20.108Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T13:47:20.108Z] Venue Found: [TEST]
+[2026-01-30T13:47:20.108Z] Ready to Update DB...
+
+[2026-01-30T13:47:30.093Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T13:47:30.093Z] Venue Found: [TEST]
+[2026-01-30T13:47:30.093Z] Ready to Update DB...
+
+[2026-01-30T13:47:40.352Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T13:47:40.352Z] Venue Found: [TEST]
+[2026-01-30T13:47:40.352Z] Ready to Update DB...
+
+[2026-01-30T13:48:13.113Z] START Update: ID=cml0oaj060001taocarcvjqwq
+[2026-01-30T13:48:13.113Z] Venue Found: [TEST]
+[2026-01-30T13:48:13.113Z] Ready to Update DB...

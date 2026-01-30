@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { updateVenueStep } from "@/actions/venue";
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { DRESS_CODES, AGE_POLICIES, PAYMENT_METHODS, AMBIANCES, CUISINES } from "@/lib/constants";
+import TimePicker from "@/components/ui/TimePicker";
+import { getVenueTypeFields } from "@/actions/dynamic-fields";
 
-export default function DetailsStep({ venueId, onNext, onBack, initialData }: { venueId: string, onNext: (data: any) => void, onBack: () => void, initialData?: any }) {
+export default function DetailsStep({ venueId, onNext, onBack, initialData, onDataChange }: { venueId: string, onNext: (data: any) => void, onBack: () => void, initialData?: any, onDataChange: (data: any) => void }) {
     const [isLoading, setIsLoading] = useState(false);
+    const [dynamicFields, setDynamicFields] = useState<any[]>([]);
 
     // Contact - Initialize from initialData
     const [phone, setPhone] = useState(initialData?.phone || "");
@@ -17,11 +20,6 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
     // Identity Details
     const [ambiance, setAmbiance] = useState(initialData?.ambiance || "");
     const [cuisine, setCuisine] = useState(initialData?.cuisine || "");
-
-    // Opening Hours
-    const [openingDays, setOpeningDays] = useState<string[]>(initialData?.openingDays || []);
-    const [startHour, setStartHour] = useState(initialData?.startHour || "");
-    const [endHour, setEndHour] = useState(initialData?.endHour || "");
 
     // Policies - Initialize from initialData
     const [dressCode, setDressCode] = useState(initialData?.dressCode || "");
@@ -36,6 +34,18 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
     const [parkingAvailable, setParkingAvailable] = useState(initialData?.parkingAvailable || false);
     const [valetParking, setValetParking] = useState(initialData?.valetParking || false);
     const [reservationsEnabled, setReservationsEnabled] = useState(initialData?.reservationsEnabled !== false); // Default true
+
+    // Fetch dynamic fields based on subcategory
+    useEffect(() => {
+        if (initialData?.subcategory) {
+            getVenueTypeFields(initialData.subcategory).then(setDynamicFields);
+        }
+    }, [initialData?.subcategory]);
+
+    function getOptionsFor(fieldKey: string) {
+        const field = dynamicFields.find(f => f.field_key === fieldKey);
+        return field && field.options && Array.isArray(field.options) ? field.options : [];
+    }
 
     const togglePaymentMethod = (method: string) => {
         if (paymentMethods.includes(method)) {
@@ -59,10 +69,7 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
             valetParking,
             reservationsEnabled,
             ambiance,
-            cuisine,
-            openingDays,
-            startHour,
-            endHour
+            cuisine
         });
 
         if (res?.success) {
@@ -70,11 +77,17 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
                 phone, website, instagram,
                 dressCode, agePolicy, paymentMethods,
                 parkingAvailable, valetParking, reservationsEnabled,
-                ambiance, cuisine, openingDays, startHour, endHour
+                ambiance, cuisine
             });
         } else {
             console.error("Details Step Error:", res?.error);
-            alert(res?.error || "Failed to save details. Please try again.");
+            if (res?.error === "DRAFT_NOT_FOUND") {
+                alert("This venue draft no longer exists in our database. We'll refresh the page so you can start fresh.");
+                localStorage.clear();
+                window.location.href = "/business/add-venue";
+            } else {
+                alert(res?.error || "Failed to save details. Please try again.");
+            }
         }
         setIsLoading(false);
     }
@@ -94,66 +107,19 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
                         <label className="text-sm text-zinc-400">Ambiance (Optional)</label>
                         <select value={ambiance} onChange={e => setAmbiance(e.target.value)} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
                             <option value="">Select Ambiance...</option>
-                            {AMBIANCES.map(a => <option key={a} value={a}>{a}</option>)}
+                            {(getOptionsFor('ambiance').length > 0 ? getOptionsFor('ambiance') : AMBIANCES.map(l => ({ value: l, label_en: l }))).map((opt: any) => (
+                                <option key={opt.value} value={opt.value}>{opt.label_en || opt.value}</option>
+                            ))}
                         </select>
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm text-zinc-400">Cuisine / Secondary Style (Optional)</label>
                         <select value={cuisine} onChange={e => setCuisine(e.target.value)} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
                             <option value="">Select Style...</option>
-                            {CUISINES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            {/* Opening Hours */}
-            <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white border-b border-white/10 pb-2">Opening Schedule</h3>
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <label className="text-sm text-zinc-400">Opening Days</label>
-                        <div className="flex flex-wrap gap-2">
-                            {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => (
-                                <button
-                                    key={day}
-                                    type="button"
-                                    onClick={() => {
-                                        if (openingDays.includes(day)) {
-                                            setOpeningDays(openingDays.filter(d => d !== day));
-                                        } else {
-                                            setOpeningDays([...openingDays, day]);
-                                        }
-                                    }}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${openingDays.includes(day)
-                                        ? "bg-indigo-600 border-indigo-500 text-white"
-                                        : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500"
-                                        }`}
-                                >
-                                    {day.slice(0, 3)}
-                                </button>
+                            {(getOptionsFor('cuisine_types').length > 0 ? getOptionsFor('cuisine_types') : CUISINES.map(l => ({ value: l, label_en: l }))).map((opt: any) => (
+                                <option key={opt.value} value={opt.value}>{opt.label_en || opt.value}</option>
                             ))}
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-sm text-zinc-400">Opening Time</label>
-                            <input
-                                type="time"
-                                value={startHour}
-                                onChange={e => setStartHour(e.target.value)}
-                                className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm text-zinc-400">Closing Time</label>
-                            <input
-                                type="time"
-                                value={endHour}
-                                onChange={e => setEndHour(e.target.value)}
-                                className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none"
-                            />
-                        </div>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -194,10 +160,9 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
                         <label className="text-sm text-zinc-400">Dress Code</label>
                         <select value={dressCode} onChange={e => setDressCode(e.target.value)} className="w-full bg-zinc-800 border-zinc-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-600 outline-none">
                             <option value="">Select Dress Code...</option>
-                            <option value="Casual">Casual</option>
-                            <option value="Smart Casual">Smart Casual</option>
-                            <option value="Formal">Formal</option>
-                            <option value="Beachwear">Beachwear</option>
+                            {(getOptionsFor('dress_code').length > 0 ? getOptionsFor('dress_code') : DRESS_CODES.map(l => ({ value: l, label_en: l }))).map((opt: any) => (
+                                <option key={opt.value} value={opt.value}>{opt.label_en || opt.value}</option>
+                            ))}
                         </select>
                     </div>
                     <div className="space-y-2">
@@ -316,6 +281,6 @@ export default function DetailsStep({ venueId, onNext, onBack, initialData }: { 
                 .phone-input-dark input { background: transparent; border: none; outline: none; color: white; width: 100%; }
                 .phone-input-dark input::placeholder { color: #52525b; }
             `}</style>
-        </div>
+        </div >
     );
 }

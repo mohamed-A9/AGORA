@@ -1,0 +1,61 @@
+{
+  "users": [
+    {
+      "id": "cmkpcwl730000ta8kdp2k3hl0",
+      "email": "mohamed.fatih.job@gmail.com",
+      "role": "BUSINESS"
+    },
+    {
+      "id": "cmkpe7azr0000tazcfcsihel6",
+      "email": "admin@agora.com",
+      "role": "ADMIN"
+    },
+    {
+      "id": "cmkpp0gt10023ta2wy1v96i8e",
+      "email": "fatmidou@gmail.com",
+      "role": "USER"
+    },
+    {
+      "id": "cmkpq1ou70000takgg6i7yvst",
+      "email": "fatiheduc@gmail.com",
+      "role": "USER"
+    }
+  ],
+  "venues": [
+    {
+      "id": "cmkpc1yov00gbtaqkz3b7a3hd",
+      "name": "Hammam Ziani",
+      "ownerId": null,
+      "status": "APPROVED",
+      "owner": null
+    },
+    {
+      "id": "cmkpc1xvz00g0taqk9dardjpd",
+      "name": "Hassan II Mosque",
+      "ownerId": null,
+      "status": "APPROVED",
+      "owner": null
+    },
+    {
+      "id": "cmkpc1wy600fmtaqkrpv9qbei",
+      "name": "PAUL",
+      "ownerId": null,
+      "status": "APPROVED",
+      "owner": null
+    },
+    {
+      "id": "cmkpc1vw700f6taqkhnsvhjhy",
+      "name": "Espressolab",
+      "ownerId": null,
+      "status": "APPROVED",
+      "owner": null
+    },
+    {
+      "id": "cmkpc1v2l00estaqk5jcsjete",
+      "name": "Bondi Coffee Kitchen",
+      "ownerId": null,
+      "status": "APPROVED",
+      "owner": null
+    }
+  ]
+}

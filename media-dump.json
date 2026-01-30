@@ -1,0 +1,71 @@
+[
+  {
+    "id": "cmkpc1sz500dztaqkqqjz2s1f",
+    "name": "Caféino",
+    "slug": "cafino-109",
+    "description": "A cozy and bustling cafe strategically located in Casa Port, offering high-quality coffee and quick bites for travelers and locals alike.",
+    "mainCategory": "CAFE",
+    "cityId": "cmkpc0cej0003taqkhioeycl5",
+    "address": "Casa Port, Casablanca 20000",
+    "lat": 33.599,
+    "lng": -7.615,
+    "priceLevel": 1,
+    "phone": "+212 5376-17942",
+    "website": null,
+    "instagram": null,
+    "coverImageUrl": "https://res.cloudinary.com/dt5sqovt9/image/upload/v1769079324/agora/venues_real/cafino-109_0_1769079313396.jpg",
+    "ownerId": null,
+    "isVerified": true,
+    "isActive": true,
+    "rating": 4.832798316607463,
+    "numReviews": 127,
+    "createdAt": "2026-01-22T10:52:30.833Z",
+    "updatedAt": "2026-01-22T14:10:05.316Z",
+    "locationUrl": "https://goo.gl/maps/Cafeino",
+    "reservationsEnabled": true,
+    "status": "APPROVED",
+    "facebookUrl": null,
+    "gallery": [
+      {
+        "id": "cmkpj3vyc0001ta2w2udrhhbf",
+        "venueId": "cmkpc1sz500dztaqkqqjz2s1f",
+        "url": "https://res.cloudinary.com/dt5sqovt9/image/upload/v1769079325/agora/venues_real/cafino-109_1_1769079315215.jpg",
+        "kind": "image",
+        "sortOrder": 1,
+        "createdAt": "2026-01-22T14:10:05.316Z"
+      },
+      {
+        "id": "cmkpj3vyc0002ta2wb9zj57lz",
+        "venueId": "cmkpc1sz500dztaqkqqjz2s1f",
+        "url": "https://res.cloudinary.com/dt5sqovt9/image/upload/v1769079326/agora/venues_real/cafino-109_2_1769079316253.jpg",
+        "kind": "image",
+        "sortOrder": 2,
+        "createdAt": "2026-01-22T14:10:05.316Z"
+      },
+      {
+        "id": "cmkpj3vyc0003ta2w1li80ot6",
+        "venueId": "cmkpc1sz500dztaqkqqjz2s1f",
+        "url": "https://res.cloudinary.com/dt5sqovt9/image/upload/v1769079328/agora/venues_real/cafino-109_3_1769079318066.jpg",
+        "kind": "image",
+        "sortOrder": 3,
+        "createdAt": "2026-01-22T14:10:05.316Z"
+      },
+      {
+        "id": "cmkpj3vyc0000ta2wf76hiwhe",
+        "venueId": "cmkpc1sz500dztaqkqqjz2s1f",
+        "url": "https://res.cloudinary.com/dt5sqovt9/image/upload/c_crop,x_0,y_488,w_1482,h_1112/v1769079325/agora/venues_real/cafino-109_0_1769079313396.jpg",
+        "kind": "image",
+        "sortOrder": 0,
+        "createdAt": "2026-01-22T14:10:05.316Z"
+      },
+      {
+        "id": "cmkpj3vyc0004ta2weotj78rp",
+        "venueId": "cmkpc1sz500dztaqkqqjz2s1f",
+        "url": "https://res.cloudinary.com/dt5sqovt9/image/upload/c_crop,x_0,y_239,w_1600,h_1200/v1769079325/agora/venues_real/cafino-109_4_1769079319482.jpg",
+        "kind": "image",
+        "sortOrder": 4,
+        "createdAt": "2026-01-22T14:10:05.316Z"
+      }
+    ]
+  }
+]

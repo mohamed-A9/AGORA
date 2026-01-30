@@ -1,0 +1,39 @@
+[
+  {
+    "id": "cmkzjte880001taf0cevecitk",
+    "name": "Debug Test Venue 2",
+    "ownerId": "cmkpcwl730000ta8kdp2k3hl0",
+    "status": "DRAFT",
+    "owner": {
+      "email": "mohamed.fatih.job@gmail.com"
+    }
+  },
+  {
+    "id": "cmkpc1yov00gbtaqkz3b7a3hd",
+    "name": "Hammam Ziani",
+    "ownerId": null,
+    "status": "APPROVED",
+    "owner": null
+  },
+  {
+    "id": "cmkpc1xvz00g0taqk9dardjpd",
+    "name": "Hassan II Mosque",
+    "ownerId": null,
+    "status": "APPROVED",
+    "owner": null
+  },
+  {
+    "id": "cmkpc1wy600fmtaqkrpv9qbei",
+    "name": "PAUL",
+    "ownerId": null,
+    "status": "APPROVED",
+    "owner": null
+  },
+  {
+    "id": "cmkpc1vw700f6taqkhnsvhjhy",
+    "name": "Espressolab",
+    "ownerId": null,
+    "status": "APPROVED",
+    "owner": null
+  }
+]

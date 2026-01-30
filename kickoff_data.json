@@ -1,0 +1,37 @@
+{
+  "name": "Kick Off",
+  "id": "cmkqz7l440001taokul2v8wnp",
+  "mainCategory": "NIGHTLIFE_BARS",
+  "status": "PENDING",
+  "galleryCount": 0,
+  "gallery": [],
+  "subcategoriesCount": 0,
+  "subcategories": [],
+  "cuisinesCount": 1,
+  "cuisines": [
+    {
+      "venueId": "cmkqz7l440001taokul2v8wnp",
+      "cuisineId": "cmkqxf62b0004ta5oyoqcpq5x",
+      "cuisine": {
+        "id": "cmkqxf62b0004ta5oyoqcpq5x",
+        "name": "Comfort Food",
+        "slug": "comfort-food",
+        "region": null,
+        "createdAt": "2026-01-23T13:38:32.435Z"
+      }
+    }
+  ],
+  "vibesCount": 1,
+  "vibes": [
+    {
+      "venueId": "cmkqz7l440001taokul2v8wnp",
+      "vibeId": "cmkpc1u4z00ehtaqkfk7j9oux",
+      "vibe": {
+        "id": "cmkpc1u4z00ehtaqkfk7j9oux",
+        "name": "Modern",
+        "slug": "modern",
+        "createdAt": "2026-01-22T10:52:32.339Z"
+      }
+    }
+  ]
+}

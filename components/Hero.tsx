@@ -60,7 +60,7 @@ export default function Hero() {
         </div>
 
         <div className="hidden md:flex flex-col items-center gap-4">
-          <div className="w-full max-w-3xl flex bg-black/40 backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl animate-fade-in divide-x divide-white/5 p-1">
+          <div className="w-full max-w-3xl flex bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl animate-fade-in divide-x divide-white/5 p-1">
             <SearchDropdown
               label="What are you looking for?"
               placeholder="Select Vibe"

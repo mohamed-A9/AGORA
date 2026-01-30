@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { signIn, useSession, signOut } from "next-auth/react";
 import Cookies from "js-cookie";
 
 type Role = "USER" | "BUSINESS";
@@ -33,7 +33,24 @@ function makeParticles(count: number): Particle[] {
 function SignUpPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { status: sessionStatus, data: session } = useSession();
+
   const initialRole = searchParams.get("role") === "business" ? "BUSINESS" : "USER";
+
+  // Check if there's an error in URL - if so, don't auto-redirect
+  const hasError = searchParams.get("error");
+
+  // Redirect if already logged in (but NOT if there's an error to show)
+  useEffect(() => {
+    if (sessionStatus === "authenticated" && !hasError) {
+      const userRole = (session?.user as any)?.role;
+      if (userRole === "BUSINESS") {
+        router.replace("/business/dashboard");
+      } else {
+        router.replace("/dashboard");
+      }
+    }
+  }, [sessionStatus, router, session, hasError]);
 
   const [role, setRole] = useState<Role>(initialRole);
   const [name, setName] = useState("");
@@ -45,7 +62,12 @@ function SignUpPageContent() {
   const [showEmailForm, setShowEmailForm] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  // Initialize error from URL immediately
+  const urlError = searchParams.get("error");
+  const [error, setError] = useState<string | null>(
+    urlError ? `⚠️ Authentication Error: ${urlError}` : null
+  );
 
   const [particles, setParticles] = useState<Particle[]>([]);
   const [year, setYear] = useState<number>(2026);
@@ -53,6 +75,74 @@ function SignUpPageContent() {
   useEffect(() => {
     setYear(new Date().getFullYear());
   }, []);
+
+  // Check for authentication errors in URL
+  useEffect(() => {
+    const error = searchParams.get("error");
+    console.log('🔍 Signup page - checking for error:', error);
+
+    if (error) {
+      // Check if it's a role mismatch error from our custom error
+      if (error.includes("ROLE_MISMATCH")) {
+        console.log('✅ Role mismatch error detected, parsing roles');
+
+        // Parse the error message to extract existing role and intended role
+        // Error format: "ROLE_MISMATCH: Email ... is already registered as USER, cannot sign in as BUSINESS"
+        const existingRoleMatch = error.match(/registered as (\w+)/);
+        const intendedRoleMatch = error.match(/sign in as (\w+)/);
+
+        const existingRole = existingRoleMatch ? existingRoleMatch[1] : null;
+        const intendedRole = intendedRoleMatch ? intendedRoleMatch[1] : null;
+
+        console.log('Parsed roles:', { existingRole, intendedRole });
+
+        // Sign out the user since the authentication failed
+        signOut({ redirect: false });
+
+        // Convert role codes to user-friendly names
+        const existingAccountType = existingRole === "USER" ? "Member" : "Business";
+        const intendedAccountType = intendedRole === "BUSINESS" ? "Business" : "Member";
+
+        setError(
+          `⚠️ This email is already registered as a ${existingAccountType} account.\n\n` +
+          `To create a ${intendedAccountType} account, please:\n` +
+          `• Use a different email address, OR\n` +
+          `• Go to the Login page and sign in with your existing ${existingAccountType} account`
+        );
+      } else if (error === "Configuration") {
+        console.log('✅ Configuration error detected');
+        signOut({ redirect: false });
+        setError(
+          `⚠️ Authentication Error\n\n` +
+          `There was a configuration issue. Please try again or contact support.`
+        );
+      } else if (error === "AccountNotLinked" || error === "OAuthAccountNotLinked") {
+        console.log('✅ AccountNotLinked error detected');
+        setError(
+          "⚠️ This email is already registered with a different sign-in method.\n\n" +
+          "Please use the original sign-in method you used to create this account."
+        );
+      } else if (error === "AccessDenied") {
+        console.log('✅ AccessDenied error detected');
+        setError(
+          `⚠️ Access Denied\n\n` +
+          `Authentication failed. Please try again or contact support.`
+        );
+      } else if (error === "OAuthCallback") {
+        console.log('✅ OAuthCallback error detected');
+        setError(
+          "⚠️ Authentication Failed\n\n" +
+          "The selected email may already be in use with a different account type.\n" +
+          "Please try a different email or contact support."
+        );
+      } else {
+        console.log('⚠️ Generic error detected:', error);
+        setError(`⚠️ Authentication Error\n\nPlease try again or contact support.`);
+      }
+    } else {
+      console.log('ℹ️ No error in URL');
+    }
+  }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -91,7 +181,11 @@ function SignUpPageContent() {
 
     if (!res.ok) {
       setLoading(false);
-      setError(data?.error || "Error during sign up.");
+      if (data?.error === "EMAIL_ALREADY_USED") {
+        setError(`This email is already associated with an account.`);
+      } else {
+        setError(data?.error || "Error during sign up.");
+      }
       return;
     }
 
@@ -135,6 +229,13 @@ function SignUpPageContent() {
                   <p className="text-white/40 text-xs font-medium">Choose your account type to proceed.</p>
                 </div>
 
+                {/* ERROR MESSAGE - VISIBLE ALWAYS */}
+                {error && (
+                  <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200 text-left whitespace-pre-line mb-6">
+                    {error}
+                  </div>
+                )}
+
                 {/* Role Selection */}
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   <button
@@ -170,7 +271,8 @@ function SignUpPageContent() {
                 <div className="flex flex-col gap-2.5">
                   <button
                     onClick={() => {
-                      Cookies.set("signup-role", role, { expires: 1 });
+                      Cookies.remove("login-role", { path: '/' }); // Clear any old login-role
+                      Cookies.set("signup-role", role, { expires: 1, path: '/' });
                       signIn("google", { callbackUrl: "/" });
                     }}
                     className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/10"
@@ -186,7 +288,8 @@ function SignUpPageContent() {
 
                   <button
                     onClick={() => {
-                      Cookies.set("signup-role", role, { expires: 1 });
+                      Cookies.remove("login-role", { path: '/' }); // Clear any old login-role
+                      Cookies.set("signup-role", role, { expires: 1, path: '/' });
                       signIn("facebook", { callbackUrl: "/" });
                     }}
                     className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-[#1877F2]/20 px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1877F2]/30"
@@ -227,7 +330,7 @@ function SignUpPageContent() {
                   </div>
 
                   {error && (
-                    <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200 text-center">
+                    <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200 text-left whitespace-pre-line">
                       {error}
                     </div>
                   )}

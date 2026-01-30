@@ -43,7 +43,7 @@ export const authOptions: NextAuthOptions = {
 
   pages: {
     signIn: "/login",
-    error: "/login",
+    error: "/signup", // Redirect to signup page on error (e.g., role mismatch)
   },
 
   providers: [
@@ -53,7 +53,7 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
-          prompt: "consent",
+          prompt: "consent select_account",
           access_type: "offline",
           response_type: "code"
         }
@@ -69,11 +69,13 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email", placeholder: "you@domain.com" },
         password: { label: "Password", type: "password" },
+        role: { label: "Role", type: "text" },
       },
 
       async authorize(credentials) {
         const email = credentials?.email?.toLowerCase().trim();
         const password = credentials?.password;
+        const intendedRole = credentials?.role; // "USER" or "BUSINESS"
 
         if (!email || !password) return null;
 
@@ -91,6 +93,11 @@ export const authOptions: NextAuthOptions = {
 
         // If user exists but has no password (signed up via OAuth), return null
         if (!user || !user.password) return null;
+
+        // Check correct role - DISABLED to allow login
+        // if (intendedRole && user.role !== intendedRole) {
+        //   throw new Error("WRONG_ROLE");
+        // }
 
         // Password check
         const ok = await bcrypt.compare(password, user.password);
@@ -110,6 +117,52 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
+    async signIn({ user, account, profile }) {
+      // 1. Check existing user by email (case-insensitive)
+      if (!user.email) return true;
+
+      const email = user.email.toLowerCase().trim();
+
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+        select: { role: true, email: true },
+      });
+
+      // 2. Read intended role from cookies
+      const cookieStore = await cookies();
+      const allCookies = cookieStore.getAll();
+      const loginRole = cookieStore.get("login-role")?.value;
+      const signupRole = cookieStore.get("signup-role")?.value;
+      const intendedRole = loginRole || signupRole;
+
+      console.log('🔐 SignIn Callback Debug:', {
+        email,
+        existingUser: existingUser ? { role: existingUser.role } : null,
+        loginRole,
+        signupRole,
+        intendedRole,
+        allCookies: allCookies.map(c => ({ name: c.name, value: c.value })),
+        provider: account?.provider
+      });
+
+      // 3. If user exists, enforce role match
+      if (existingUser) {
+        if (intendedRole && existingUser.role !== intendedRole) {
+          console.log('⚠️ Role mismatch detected but allowing login:', {
+            existingRole: existingUser.role,
+            intendedRole,
+            email
+          });
+          // We allow the login. The session will use the existingUser.role.
+          // This fixes the issue where a Business user trying to "Login" (defaulting to USER role in UI) gets blocked.
+        }
+      }
+
+      // 4. If user does NOT exist (new signup), let it proceed.
+      console.log('✅ Sign-in allowed for:', email);
+      return true;
+    },
+
     async jwt({ token, user, account }) {
       // On login, persist custom fields into JWT
       if (user) {

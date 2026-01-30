@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
     const session = await getServerSession(authOptions);
 
@@ -16,8 +18,11 @@ export async function GET() {
 
     const venues = await prisma.venue.findMany({
         where: { ownerId },
-        // orderBy: { createdAt: "desc" }, // Temporarily disabled
-        include: { media: true }
+        orderBy: { createdAt: "desc" },
+        include: {
+            gallery: true,
+            city: true
+        }
     });
 
     return NextResponse.json({ venues });

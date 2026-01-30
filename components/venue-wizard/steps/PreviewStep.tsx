@@ -3,35 +3,102 @@
 import { useState } from "react";
 import { updateVenueStep } from "@/actions/venue";
 import { useRouter } from "next/navigation";
-import { CheckCircle, MapPin, Phone, Clock, FileText } from "lucide-react";
+import { CheckCircle, MapPin, Phone, Clock, FileText, X } from "lucide-react";
+import Toast from "@/components/Toast";
+
+function ConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void, onCancel: () => void }) {
+    return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-in fade-in">
+            <div className="bg-zinc-900 border-2 border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4">
+                <div className="flex items-start gap-4 mb-6">
+                    <div className="p-3 bg-emerald-500/20 rounded-xl">
+                        <CheckCircle className="w-8 h-8 text-emerald-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-white mb-2">Ready to Submit?</h3>
+                        <p className="text-zinc-400 text-sm leading-relaxed">
+                            Your venue will be submitted for review. Our team will verify the information and approve it within 24-48 hours.
+                        </p>
+                    </div>
+                </div>
+                <div className="flex gap-3">
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-colors"
+                    >
+                        Submit Venue
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export default function PreviewStep({ venueId, onBack, initialData }: { venueId: string, onBack: () => void, initialData: any }) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [toast, setToast] = useState<{ message: string, type: "success" | "error" | "info" } | null>(null);
     const data = initialData || {};
 
-    async function handlePublish() {
-        if (!confirm("Are you ready to submit your venue for review?")) return;
+    const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
+        setToast({ message, type });
+    };
 
+    async function handlePublish() {
+        console.log("DEBUG: handlePublish called for venueId:", venueId);
+
+        setShowConfirm(false);
         setIsLoading(true);
 
-        // Update status to PENDING (or APPROVED for testing)
-        // Check `VenueStatus` enum: DRAFT, PENDING, APPROVED, REJECTED, SUSPENDED
         const res = await updateVenueStep(venueId, {
             status: "PENDING"
         });
 
+        console.log("DEBUG: updateVenueStep response:", res);
+
         if (res?.success) {
-            // Redirect to dashboard or success page
-            router.push("/business/dashboard?success=venue-submitted");
+            // Clear local storage draft
+            localStorage.removeItem("agora_wizard_step");
+            localStorage.removeItem("agora_wizard_venue_id");
+            localStorage.removeItem("agora_wizard_data");
+
+            showToast("Venue submitted successfully! Redirecting...", "success");
+
+            // Redirect after showing success message
+            setTimeout(() => {
+                router.push("/business/my-venues?success=venue-submitted");
+                router.refresh();
+            }, 1500);
         } else {
-            alert(res?.error || "Failed to submit venue.");
+            showToast(res?.error || "Failed to submit venue. Please try again.", "error");
             setIsLoading(false);
         }
     }
 
     return (
         <div className="space-y-8">
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
+
+            {showConfirm && (
+                <ConfirmModal
+                    onConfirm={handlePublish}
+                    onCancel={() => setShowConfirm(false)}
+                />
+            )}
+
             <div>
                 <h2 className="text-2xl font-bold text-white mb-2">Step 5: Review & Publish</h2>
                 <p className="text-zinc-400">Review your information before submitting.</p>
@@ -106,7 +173,11 @@ export default function PreviewStep({ venueId, onBack, initialData }: { venueId:
                 <button onClick={onBack} disabled={isLoading} className="text-zinc-400 hover:text-white px-4 py-2">
                     Back
                 </button>
-                <button onClick={handlePublish} disabled={isLoading} className="bg-emerald-600 text-white px-8 py-3 rounded-full font-bold hover:bg-emerald-500 transition-colors disabled:opacity-50">
+                <button
+                    onClick={() => setShowConfirm(true)}
+                    disabled={isLoading}
+                    className="bg-emerald-600 text-white px-8 py-3 rounded-full font-bold hover:bg-emerald-500 transition-colors disabled:opacity-50"
+                >
                     {isLoading ? "Submitting..." : "Submit Venue"}
                 </button>
             </div>

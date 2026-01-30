@@ -7,51 +7,66 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model City {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  country   String   @default("Morocco")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  events    Event[]
+  venues    Venue[]
+
+}
+
+model Country {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique // MA, FR, etc.
+  dialCode  String   // +212, +33
+  flag      String   // Emoji
+  createdAt DateTime @default(now())
+}
+
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  role          Role      @default(USER)
-  emailVerificationToken String?
+  id                         String    @id @default(cuid())
+  name                       String?
+  email                      String?   @unique
+  emailVerified              DateTime?
+  image                      String?
+  password                   String?
+  role                       String    @default("USER")
+  phone                      String?
+  birthday                   DateTime?
+  gender                     String?
+  emailVerificationToken     String?   @unique
   emailVerificationExpiresAt DateTime?
-  resetPasswordToken String?
-  resetPasswordExpiresAt DateTime?
-  birthday      DateTime?
-  gender        String?
-  accounts      Account[]
-  sessions      Session[]
-  
-  // Preferences
-  preferredCities     String[]
-  preferredCategories String[]
-  preferredAmbiances  String[]
-
-  phone         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  // Relations
-  reservations  Reservation[]
-  reviews       Review[]
-  venues        Venue[]
+  resetPasswordToken         String?   @unique
+  resetPasswordExpiresAt     DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  accounts                   Account[]
+  sessions                   Session[]
+  reviews                    Review[]
+  venues                     Venue[]
+  preferredCities            String[]  @default([])
+  preferredCategories        String[]  @default([])
+  preferredAmbiances         String[]  @default([])
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -66,216 +81,342 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model Venue {
-  id                  String        @id @default(cuid())
-  name                String
-  // Identity
-  tagline             String?
-  description         String?
-  category            String?
-  subcategory         String?
-  specialization      String?
-  ambiance            String?
-  cuisine             String?
-  email               String?
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-  // Location
-  address             String
-  city                String
-  neighborhood        String?
-  locationUrl         String?
-  lat                 Float?
-  lng                 Float?
-
-  // Contact & Socials
-  phone               String?
-  whatsapp            String?
-  website             String?
-  instagram           String?
-  tiktok              String?
-
-  // Status & Access
-  status              VenueStatus   @default(DRAFT)
-  ownerId             String
-  venueTypeId         Int?
-  
-  approvedAt          DateTime?
-  approvedBy          String?
-  
-  // Operational
-  hasOutdoorSeating   Boolean       @default(false)
-  hasSmokingArea      Boolean       @default(false)
-  hasLiveMusic        Boolean       @default(false)
-  hasDJ               Boolean       @default(false)
-  hasPrivateRooms     Boolean       @default(false)
-  hasHeaters          Boolean       @default(false)
-  hasAC               Boolean       @default(false)
-  hasTV               Boolean       @default(false)
-  hasProjector        Boolean       @default(false)
-  hasStage            Boolean       @default(false)
-  hasMicrophone       Boolean       @default(false)
-  hasSoundSystem      Boolean       @default(false)
-  hasValetParking     Boolean       @default(false)
-  hasParking          Boolean       @default(false)
-  hasWifi             Boolean       @default(false)
-  isPetFriendly       Boolean       @default(false)
-  isFamilyFriendly    Boolean       @default(false)
-  isWheelchairAccessible Boolean    @default(false)
-  hasDanceFloor       Boolean       @default(false)
-  hasGlutenFreeOptions Boolean      @default(false)
-  hasSugarFreeOptions Boolean       @default(false)
-  hasSaltFreeOptions  Boolean       @default(false)
-  hasBabyChairs       Boolean       @default(false)
-  
-  // Facilities
-  parkingAvailable    Boolean       @default(false)
-  valetParking        Boolean       @default(false)
-  amenities           String[]      // Array of strings for tags (WiFi, etc.)
-
-  // Policies (Structured)
-  reservationPolicy   String?       // walk-in, reservation, both
-  cancelationPolicy   String?
-  paymentMethods      String[]
-  dressCode           String?
-  agePolicy           String?
-  entryPolicy         String?       // free, paid, guestlist
-  minSpendPolicy      String?
-
-  // Legacy/Other
-  reservationsEnabled Boolean       @default(true)
-  openingHours        String?
-  openingDays         String[]      // e.g. ["Monday", "Tuesday"]
-  startHour           String?       // e.g. "09:00"
-  endHour             String?       // e.g. "23:00"
-  weeklySchedule      Json?
-  startDate           DateTime?
-  endDate             DateTime?
-  media               Media[]
-  reservations        Reservation[]
-  reviews             Review[]
-  owner               User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  venueType           VenueType?    @relation(fields: [venueTypeId], references: [id])
-  attributes          VenueAttribute[]
-  events              Event[]
-}
-
-model Media {
-  id        String   @id @default(cuid())
-  url       String
-  type      String
-  venueId   String?
-  eventId   String?
-  createdAt DateTime @default(now())
-  venue     Venue?   @relation(fields: [venueId], references: [id], onDelete: Cascade)
-  event     Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model Reservation {
-  id        String   @id @default(cuid())
-  venueId   String
-  userId    String
-  dateTime  DateTime
-  status    String
-  qrToken   String   @unique
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  @@unique([identifier, token])
 }
 
 model Review {
   id        String   @id @default(cuid())
   rating    Int
   comment   String?
-  venueId   String
   userId    String
+  venueId   String
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+  @@index([userId])
 }
 
-model VenueType {
-  id                  Int     @id @default(autoincrement())
-  category_code       String
-  category_name_en    String
-  category_name_fr    String
-  category_name_ar    String
-  subcategory_code    String
-  subcategory_name_en String
-  subcategory_name_fr String
-  subcategory_name_ar String
-  icon                String
-  is_active           Boolean @default(true)
-  venues              Venue[]
+model Venue {
+  id                  String             @id @default(cuid())
+  name                String
+  slug                String             @unique
+  description         String?
+  mainCategory        MainCategory
+  cityId              String?
+  address             String?
+  lat                 Float?
+  lng                 Float?
+  priceLevel          Int?
+  phone               String?
+  email               String?
+  website             String?
+  instagram           String?
+  coverImageUrl       String?
+  menuUrl             String?
+  ownerId             String?
+  isVerified          Boolean            @default(false)
+  isActive            Boolean            @default(true)
+  rating              Float              @default(0)
+  numReviews          Int                @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  locationUrl         String?
+  wazeUrl             String?
+  instagramUrl        String?
+  tiktokUrl           String?
+  reservationsEnabled Boolean            @default(true)
+  status              String             @default("APPROVED")
+  reservationPolicy   ReservationPolicy  @default(AGORA)
+  reservationPhoneNumber String?
+  reservationUrl       String?
+  facebookUrl         String?
+  openingHours        String?
+  weeklySchedule      Json?
+  floorPlan           Json?
+  neighborhood        String?
+  dressCode           String?
+  agePolicy           String?
+  paymentMethods      String[]           @default([])
+  parkingAvailable    Boolean            @default(false)
+  valetParking        Boolean            @default(false)
+  events              Event[]
+  reviews             Review[]
+  reservations        Reservation[]
+  city                City?              @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  owner               User?              @relation(fields: [ownerId], references: [id])
+  cuisines            VenueCuisine[]
+  facilities          VenueFacility[]
+  gallery             VenueMedia[]
+  musicTypes          VenueMusicType[]
+  policies            VenuePolicy[]
+  subcategories       VenueSubcategory[]
+  tags                VenueTag[]
+  vibes               VenueVibe[]
+  wizardStep          Int?               @default(1)      // Track wizard progress
 
-  @@unique([category_code, subcategory_code])
+  @@index([cityId])
+  @@index([mainCategory])
+  @@index([priceLevel])
+  @@index([ownerId])
+  @@index([neighborhood])
+  @@index([dressCode])
+  @@index([agePolicy])
 }
 
-enum Role {
-  USER
-  BUSINESS
-  ADMIN
+model VenueMedia {
+  id        String   @id @default(cuid())
+  venueId   String
+  url       String
+  kind      String   @default("image")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
 }
 
-enum VenueStatus {
-  DRAFT
-  PENDING
-  APPROVED
-  REJECTED
-  SUSPENDED
+model Subcategory {
+  id           String             @id @default(cuid())
+  name         String
+  slug         String             @unique
+  mainCategory MainCategory
+  createdAt    DateTime           @default(now())
+  venues       VenueSubcategory[]
+
+  @@unique([name, mainCategory])
+  @@index([mainCategory])
 }
 
-model VenueTypeField {
-  id               Int     @id @default(autoincrement())
-  subcategory_code String
-  
-  field_key        String
-  field_type       String  // text, number, boolean, single_select, multi_select, range
-  
-  label_en         String
-  label_fr         String
-  label_ar         String
-  
-  required         Boolean @default(false)
-  options          Json?   // Array of { value, label_en, label_fr, label_ar }
-  sort_order       Int     @default(0)
-  is_active        Boolean @default(true)
+model Cuisine {
+  id        String         @id @default(cuid())
+  name      String         @unique
+  slug      String         @unique
+  region    String?
+  createdAt DateTime       @default(now())
+  venues    VenueCuisine[]
+}
 
-  @@unique([subcategory_code, field_key])
+model Vibe {
+  id        String      @id @default(cuid())
+  name      String
+  slug      String      @unique
+  createdAt DateTime    @default(now())
+  events    EventVibe[]
+  venues    VenueVibe[]
+}
+
+model MusicType {
+  id        String           @id @default(cuid())
+  name      String
+  slug      String           @unique
+  createdAt DateTime         @default(now())
+  events    EventMusicType[]
+  venues    VenueMusicType[]
+}
+
+model Policy {
+  id        String        @id @default(cuid())
+  code      String        @unique
+  label     String
+  createdAt DateTime      @default(now())
+  venues    VenuePolicy[]
+}
+
+model Facility {
+  id        String          @id @default(cuid())
+  code      String          @unique
+  label     String
+  createdAt DateTime        @default(now())
+  venues    VenueFacility[]
+}
+
+model Tag {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  slug      String     @unique
+  createdAt DateTime   @default(now())
+  events    EventTag[]
+  venues    VenueTag[]
 }
 
 model Event {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  date        DateTime
-  startTime   String?
-  endTime     String?
-  
-  type        String? // e.g., "Music", "Art", "Conference", "Party"
-  genre       String? // e.g., "Techno", "Jazz", "Networking"
-  ambiance    String? // Event-specific ambiance
-  musicStyle  String? // Detailed music style if type is Music/Nightlife
-  
-  ticketsEnabled Boolean  @default(false)
+  id             String           @id @default(cuid())
+  title          String
+  slug           String           @unique
+  venueId        String?
+  cityId         String
+  startsAt       DateTime
+  endsAt         DateTime?
+  priceMin       Float?
+  priceMax       Float?
+  coverImageUrl  String?
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  description    String?
+  isTicketed     Boolean          @default(false)
   ticketingUrl   String?
-  
-  venueId     String
-  mediaUrl    String? // Legacy, prefer joining Media relation
-  media       Media[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  venue       Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  date           DateTime?
+  ticketsEnabled Boolean          @default(false)
+  type           String?
+  city           City             @relation(fields: [cityId], references: [id])
+  venue          Venue?           @relation(fields: [venueId], references: [id])
+  media          EventMedia[]
+  musicTypes     EventMusicType[]
+  tags           EventTag[]
+  vibes          EventVibe[]
+
+  @@index([cityId, startsAt])
 }
 
-model VenueAttribute {
+model EventMedia {
   id        String   @id @default(cuid())
-  venueId   String
-  field_key String
-  value_json Json    // Stores the actual value
+  eventId   String
+  url       String
+  kind      String   @default("image")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
+  @@index([eventId])
+}
+
+model VenueSubcategory {
+  venueId       String
+  subcategoryId String
+  subcategory   Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
+  venue         Venue       @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, subcategoryId])
+  @@index([subcategoryId])
+}
+
+model VenueCuisine {
+  venueId   String
+  cuisineId String
+  cuisine   Cuisine @relation(fields: [cuisineId], references: [id], onDelete: Cascade)
+  venue     Venue   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, cuisineId])
+  @@index([cuisineId])
+}
+
+model VenueVibe {
+  venueId String
+  vibeId  String
+  venue   Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  vibe    Vibe   @relation(fields: [vibeId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, vibeId])
+  @@index([vibeId])
+}
+
+model VenueMusicType {
+  venueId     String
+  musicTypeId String
+  musicType   MusicType @relation(fields: [musicTypeId], references: [id], onDelete: Cascade)
+  venue       Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, musicTypeId])
+  @@index([musicTypeId])
+}
+
+model VenuePolicy {
+  venueId  String
+  policyId String
+  policy   Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  venue    Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, policyId])
+  @@index([policyId])
+}
+
+model VenueFacility {
+  venueId    String
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  venue      Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, facilityId])
+  @@index([facilityId])
+}
+
+model VenueTag {
+  venueId String
+  tagId   String
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  venue   Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, tagId])
+  @@index([tagId])
+}
+
+model EventVibe {
+  eventId String
+  vibeId  String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  vibe    Vibe   @relation(fields: [vibeId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, vibeId])
+}
+
+model EventMusicType {
+  eventId     String
+  musicTypeId String
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  musicType   MusicType @relation(fields: [musicTypeId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, musicTypeId])
+}
+
+model EventTag {
+  eventId String
+  tagId   String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, tagId])
+}
+
+
+model Reservation {
+  id        String   @id @default(cuid())
+  date      DateTime
+  time      String?
+  partySize Int
+  status    String   @default("PENDING")
+  name      String
+  email     String
+  phone     String
+  venueId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
 
-  @@unique([venueId, field_key])
+  @@index([venueId])
+}
+
+enum MainCategory {
+  CAFE
+  RESTAURANT
+  NIGHTLIFE_BARS
+  CLUBS_PARTY
+  EVENTS
+  ACTIVITIES_FUN
+  WELLNESS_HEALTH
+}
+
+enum ReservationPolicy {
+  WALK_IN_ONLY
+  PHONE_WHATSAPP
+  EXTERNAL_LINK
+  AGORA
 }

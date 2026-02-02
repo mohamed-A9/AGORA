@@ -14,21 +14,27 @@ export async function POST(req: Request) {
 
         const { currentPassword, newPassword } = await req.json();
 
-        if (!currentPassword || !newPassword) {
-            return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
+        if (!newPassword) {
+            return NextResponse.json({ error: "Nouveau mot de passe requis" }, { status: 400 });
         }
 
         const user = await prisma.user.findUnique({
             where: { id: (session.user as any).id },
         });
 
-        if (!user || !user.password) {
+        if (!user) {
             return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
         }
 
-        const isMatch = await bcrypt.compare(currentPassword, user.password);
-        if (!isMatch) {
-            return NextResponse.json({ error: "L'ancien mot de passe est incorrect" }, { status: 400 });
+        // Only check current password if the user has one
+        if (user.password) {
+            if (!currentPassword) {
+                return NextResponse.json({ error: "L'ancien mot de passe est requis" }, { status: 400 });
+            }
+            const isMatch = await bcrypt.compare(currentPassword, user.password);
+            if (!isMatch) {
+                return NextResponse.json({ error: "L'ancien mot de passe est incorrect" }, { status: 400 });
+            }
         }
 
         const hashedNewPassword = await bcrypt.hash(newPassword, 12);

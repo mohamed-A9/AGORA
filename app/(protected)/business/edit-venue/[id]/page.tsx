@@ -455,16 +455,36 @@ export default function EditVenuePage() {
                                 <div className="space-y-4 pt-4 border-t border-white/5">
                                     <div className="flex justify-between items-center">
                                         <h3 className="text-sm font-bold text-white uppercase tracking-wider">Horaires d'Ouverture</h3>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const current = Array.isArray(formData.weeklySchedule) ? formData.weeklySchedule : [];
-                                                setFormData({ ...formData, weeklySchedule: [...current, { startDay: "Mon", endDay: "Sun", open: "09:00", close: "23:00" }] });
-                                            }}
-                                            className="text-xs bg-indigo-600/20 text-indigo-400 border border-indigo-600/50 px-3 py-1.5 rounded-lg hover:bg-indigo-600/30 transition-colors"
-                                        >
-                                            + Ajouter un créneau
-                                        </button>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (window.confirm("This will replace your current schedule with individual rows for each day. Continue?")) {
+                                                        const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+                                                        const newSchedule = days.map(day => ({
+                                                            startDay: day,
+                                                            endDay: day,
+                                                            open: "09:00",
+                                                            close: "23:00"
+                                                        }));
+                                                        setFormData({ ...formData, weeklySchedule: newSchedule });
+                                                    }
+                                                }}
+                                                className="text-xs bg-zinc-800 text-zinc-400 border border-zinc-600 px-3 py-1.5 rounded-lg hover:bg-zinc-700 hover:text-white transition-colors"
+                                            >
+                                                Set Hours for Each Day
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const current = Array.isArray(formData.weeklySchedule) ? formData.weeklySchedule : [];
+                                                    setFormData({ ...formData, weeklySchedule: [...current, { startDay: "Mon", endDay: "Sun", open: "09:00", close: "23:00" }] });
+                                                }}
+                                                className="text-xs bg-indigo-600/20 text-indigo-400 border border-indigo-600/50 px-3 py-1.5 rounded-lg hover:bg-indigo-600/30 transition-colors"
+                                            >
+                                                + Ajouter un créneau
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="space-y-3">

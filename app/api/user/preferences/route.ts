@@ -15,10 +15,15 @@ export async function GET() {
             preferredCities: true,
             preferredCategories: true,
             preferredAmbiances: true,
+            password: true,
         },
     });
 
-    return NextResponse.json(user);
+    return NextResponse.json({
+        ...user,
+        hasPassword: !!user?.password,
+        password: undefined // Don't send the hash
+    });
 }
 
 export async function POST(req: Request) {

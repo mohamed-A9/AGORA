@@ -171,7 +171,7 @@ export async function updateVenueStep(venueId: string, data: any) {
 
         const existingVenue = await prisma.venue.findUnique({
             where: { id: venueId },
-            select: { id: true, ownerId: true, name: true }
+            select: { id: true, ownerId: true, name: true, wizardStep: true }
         });
 
         if (!existingVenue) {
@@ -205,17 +205,31 @@ export async function updateVenueStep(venueId: string, data: any) {
         // ============================================
         // SANITIZE ALL INPUT DATA (Security)
         // ============================================
+        // ============================================
+        // SANITIZE ALL INPUT DATA (Security)
+        // ============================================
+        // Capture wizardStep BEFORE sanitization (in case sanitizer strips it)
+        const rawWizardStep = data.wizardStep;
+
         const sanitizedData = sanitizeVenueData(data);
 
         // Prepare data for Prisma
         const updateData = { ...sanitizedData };
         delete updateData.tagline; // Not in schema
 
-        // Extract wizardStep if provided (to track progress)
-        const wizardStep = updateData.wizardStep;
-        if (wizardStep !== undefined) {
-            delete updateData.wizardStep; // Will be set separately
+        // Parse wizardStep as integer (might come as string from frontend)
+        let wizardStep: number | undefined = undefined;
+        if (rawWizardStep !== undefined && rawWizardStep !== null) {
+            const parsed = typeof rawWizardStep === 'string' ? parseInt(rawWizardStep) : rawWizardStep;
+            if (!isNaN(parsed) && parsed > 0) {
+                wizardStep = parsed;
+                console.log(`✅ Parsed wizardStep: ${wizardStep}`);
+            } else {
+                console.log(`⚠️ Invalid wizardStep value: ${rawWizardStep}`);
+            }
         }
+
+        if (updateData.wizardStep) delete updateData.wizardStep; // Cleanup if it survived sanitization
 
         // Handle City Relation
         if (updateData.city) {
@@ -294,7 +308,16 @@ export async function updateVenueStep(venueId: string, data: any) {
         if (updateData.cuisines || updateData.cuisine) {
             const input = updateData.cuisines || updateData.cuisine;
             const rawItems = Array.isArray(input) ? input : (input ? [input] : []);
-            const items = Array.from(new Set(rawItems)); // Deduplicate
+
+            // Deduplicate by slug
+            const uniqueMap = new Map();
+            rawItems.forEach((name: string) => {
+                const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                if (slug && !uniqueMap.has(slug)) {
+                    uniqueMap.set(slug, name);
+                }
+            });
+            const items = Array.from(uniqueMap.values());
 
             updateData.cuisines = {
                 deleteMany: {},
@@ -314,7 +337,16 @@ export async function updateVenueStep(venueId: string, data: any) {
         if (updateData.vibes || updateData.ambiance) {
             const input = updateData.vibes || updateData.ambiance;
             const rawItems = Array.isArray(input) ? input : (input ? [input] : []);
-            const items = Array.from(new Set(rawItems)); // Deduplicate
+
+            // Deduplicate by slug
+            const uniqueMap = new Map();
+            rawItems.forEach((name: string) => {
+                const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                if (slug && !uniqueMap.has(slug)) {
+                    uniqueMap.set(slug, name);
+                }
+            });
+            const items = Array.from(uniqueMap.values());
 
             updateData.vibes = {
                 deleteMany: {},
@@ -333,7 +365,7 @@ export async function updateVenueStep(venueId: string, data: any) {
         // Handle Facilities (Array)
         if (updateData.facilities) {
             const rawItems = Array.isArray(updateData.facilities) ? updateData.facilities : [updateData.facilities];
-            const items = Array.from(new Set(rawItems)); // Deduplicate
+            const items = Array.from(new Set(rawItems)); // Deduplicate (Facilities use strict codes)
 
             updateData.facilities = {
                 deleteMany: {},
@@ -351,7 +383,16 @@ export async function updateVenueStep(venueId: string, data: any) {
         // Handle Music (Array)
         if (updateData.music) {
             const rawItems = Array.isArray(updateData.music) ? updateData.music : [updateData.music];
-            const items = Array.from(new Set(rawItems)); // Deduplicate
+
+            // Deduplicate by slug
+            const uniqueMap = new Map();
+            rawItems.forEach((name: string) => {
+                const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                if (slug && !uniqueMap.has(slug)) {
+                    uniqueMap.set(slug, name);
+                }
+            });
+            const items = Array.from(uniqueMap.values());
 
             updateData.musicTypes = {
                 deleteMany: {},
@@ -470,10 +511,15 @@ export async function updateVenueStep(venueId: string, data: any) {
         console.log("💾 Updating venue in database...");
         fs.appendFileSync(logFile, `[${timestamp}] Ready to Update DB...\n`);
 
+        // DEBUG: Log wizardStep before update
+        console.log(`📊 WizardStep Update: Current=${existingVenue.wizardStep}, New=${wizardStep}`);
+        fs.appendFileSync(logFile, `[${timestamp}] WizardStep: ${existingVenue.wizardStep} -> ${wizardStep}\n`);
+
         const updatedVenue = await prisma.venue.update({
             where: { id: venueId }, // Ownership already verified above
             data: {
                 ...updateData,
+                // Always update wizardStep if provided (simplified for debugging)
                 ...(wizardStep !== undefined && { wizardStep })
             }
         });

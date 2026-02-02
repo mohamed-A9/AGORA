@@ -17,24 +17,31 @@ export default function LocationStep({ venueId, onNext, onBack, initialData, onD
     const [neighborhood, setNeighborhood] = useState(initialData?.neighborhood || "");
     const [googleUrl, setGoogleUrl] = useState(initialData?.locationUrl || "");
 
-    // Schedule State: Array of { days: [], open: "10:00", close: "23:00" }
-    // User requested "From To for days". 
-    // We will simple rows: [StartDay] to [EndDay] : [Open] - [Close]
-    const [scheduleRows, setScheduleRows] = useState<any[]>(initialData?.weeklySchedule || [
-        { startDay: "Mon", endDay: "Sun", open: "09:00", close: "22:00" }
-    ]);
+    // Schedule State: 7 Fixed Rows for Mon-Sun
+    const [scheduleRows, setScheduleRows] = useState<any[]>(() => {
+        // If we have previously saved detailed schedule (length 7), use it
+        if (initialData?.weeklySchedule && Array.isArray(initialData.weeklySchedule) && initialData.weeklySchedule.length === 7 && initialData.weeklySchedule[0].day) {
+            return initialData.weeklySchedule;
+        }
 
-    const addScheduleRow = () => {
-        setScheduleRows([...scheduleRows, { startDay: "Mon", endDay: "Fri", open: "09:00", close: "18:00" }]);
-    };
+        // Otherwise (or if old format), default to 7 days open
+        return DAYS.map(day => ({
+            day: day,
+            open: "09:00",
+            close: "22:00",
+            closed: false
+        }));
+    });
 
-    const removeScheduleRow = (idx: number) => {
-        setScheduleRows(scheduleRows.filter((_, i) => i !== idx));
-    };
-
-    const updateRow = (idx: number, field: string, value: string) => {
+    const updateRow = (idx: number, field: string, value: any) => {
         const newRows = [...scheduleRows];
         newRows[idx][field] = value;
+        setScheduleRows(newRows);
+    };
+
+    const toggleClosed = (idx: number) => {
+        const newRows = [...scheduleRows];
+        newRows[idx].closed = !newRows[idx].closed;
         setScheduleRows(newRows);
     };
 
@@ -43,11 +50,12 @@ export default function LocationStep({ venueId, onNext, onBack, initialData, onD
 
         setIsLoading(true);
 
-        // Construct openingHours string or JSON
-        // Format: "Mon-Sun: 09:00-22:00"
-        const formattedHours = scheduleRows.map(row =>
-            `${row.startDay === row.endDay ? row.startDay : row.startDay + '-' + row.endDay} ${row.open} - ${row.close}`
-        ).join(", ");
+        // Construct openingHours string
+        // Format: "Mon: 09:00-22:00, Tue: Closed, ..." (Human Readable)
+        const formattedHours = scheduleRows.map(row => {
+            if (row.closed) return `${row.day}: Closed`;
+            return `${row.day}: ${row.open} - ${row.close}`;
+        }).join(", ");
 
         const res = await updateVenueStep(venueId, {
             address,
@@ -55,7 +63,6 @@ export default function LocationStep({ venueId, onNext, onBack, initialData, onD
             neighborhood,
             locationUrl: googleUrl,
             openingHours: formattedHours,
-            // We could also store structured schedule in 'weeklySchedule' JSON if needed
             weeklySchedule: scheduleRows
         });
 
@@ -134,45 +141,48 @@ export default function LocationStep({ venueId, onNext, onBack, initialData, onD
             {/* Schedule Section */}
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold text-white">Opening Schedule</h3>
-                    <button onClick={addScheduleRow} type="button" className="text-xs bg-indigo-600/20 text-indigo-400 border border-indigo-600/50 px-3 py-1 rounded hover:bg-indigo-600/30 transition-colors">
-                        + Add Time Slot
-                    </button>
+                    <h3 className="text-lg font-semibold text-white">Opening Hours</h3>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2">
                     {scheduleRows.map((row, idx) => (
-                        <div key={idx} className="flex flex-col md:flex-row gap-3 items-start md:items-center bg-zinc-800/50 p-3 rounded-lg border border-white/5">
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm text-zinc-500">From</span>
-                                <select value={row.startDay} onChange={e => updateRow(idx, 'startDay', e.target.value)} className="bg-zinc-900 border-zinc-700 rounded px-2 py-1 text-sm text-white">
-                                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
-                                <span className="text-sm text-zinc-500">To</span>
-                                <select value={row.endDay} onChange={e => updateRow(idx, 'endDay', e.target.value)} className="bg-zinc-900 border-zinc-700 rounded px-2 py-1 text-sm text-white">
-                                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
+                        <div key={row.day} className={`flex flex-col md:flex-row gap-3 items-center bg-zinc-800/50 p-3 rounded-lg border ${row.closed ? 'border-red-900/30 opacity-75' : 'border-white/5'}`}>
+
+                            {/* Day & Closed Toggle */}
+                            <div className="flex items-center justify-between w-full md:w-32">
+                                <span className="font-semibold text-zinc-300 w-12">{row.day}</span>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={!row.closed}
+                                        onChange={() => toggleClosed(idx)}
+                                        className="w-4 h-4 rounded border-zinc-600 bg-zinc-700 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-zinc-900"
+                                    />
+                                    <span className="text-xs text-zinc-500">{row.closed ? 'Closed' : 'Open'}</span>
+                                </label>
                             </div>
 
-                            <div className="hidden md:block w-px h-6 bg-white/10"></div>
+                            <div className="hidden md:block w-px h-6 bg-white/10 mx-2"></div>
 
-                            <div className="flex items-center gap-4 flex-1">
-                                <TimePicker
-                                    label="Open"
-                                    value={row.open}
-                                    onChange={(val) => updateRow(idx, 'open', val)}
-                                />
-                                <TimePicker
-                                    label="Close"
-                                    value={row.close}
-                                    onChange={(val) => updateRow(idx, 'close', val)}
-                                />
-                            </div>
-
-                            {scheduleRows.length > 1 && (
-                                <button onClick={() => removeScheduleRow(idx)} className="text-zinc-500 hover:text-red-400 p-1">
-                                    ✕
-                                </button>
+                            {/* Time Pickers (Visible if Open) */}
+                            {row.closed ? (
+                                <div className="flex-1 text-sm text-zinc-600 italic">
+                                    Closed all day
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-4 flex-1 animate-in fade-in">
+                                    <TimePicker
+                                        label="Open"
+                                        value={row.open}
+                                        onChange={(val) => updateRow(idx, 'open', val)}
+                                    />
+                                    <span className="text-zinc-500">-</span>
+                                    <TimePicker
+                                        label="Close"
+                                        value={row.close}
+                                        onChange={(val) => updateRow(idx, 'close', val)}
+                                    />
+                                </div>
                             )}
                         </div>
                     ))}

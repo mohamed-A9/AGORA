@@ -16,6 +16,7 @@ export default function ProfilePage() {
     preferredCities: [] as string[],
     preferredCategories: [] as string[],
     preferredAmbiances: [] as string[],
+    hasPassword: true, // Default to true to avoid flashing "Create Password" for normal users
   });
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function ProfilePage() {
           preferredCities: data.preferredCities || [],
           preferredCategories: data.preferredCategories || [],
           preferredAmbiances: data.preferredAmbiances || [],
+          hasPassword: data.hasPassword ?? true,
         });
       }
     } catch (e) {
@@ -62,6 +64,8 @@ export default function ProfilePage() {
   const togglePref = (key: keyof typeof prefs, val: string) => {
     setPrefs(prev => {
       const current = prev[key];
+      if (!Array.isArray(current)) return prev; // Safety check
+
       if (current.includes(val)) {
         return { ...prev, [key]: current.filter(v => v !== val) };
       } else {
@@ -154,9 +158,14 @@ export default function ProfilePage() {
               <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
                 <Lock className="w-4 h-4 text-amber-400" />
               </div>
-              <h3 className="text-xl font-bold text-white">Changer le mot de passe</h3>
+              <h3 className="text-xl font-bold text-white">
+                {prefs.hasPassword ? "Changer le mot de passe" : "Créer un mot de passe"}
+              </h3>
             </div>
-            <PasswordChangeForm />
+            <PasswordChangeForm
+              hasPassword={prefs.hasPassword}
+              onSuccess={() => setPrefs(prev => ({ ...prev, hasPassword: true }))}
+            />
           </div>
 
         </section>
@@ -271,7 +280,7 @@ export default function ProfilePage() {
   );
 }
 
-function PasswordChangeForm() {
+function PasswordChangeForm({ hasPassword, onSuccess }: { hasPassword: boolean, onSuccess: () => void }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -298,6 +307,7 @@ function PasswordChangeForm() {
 
       if (res.ok) {
         setStatus("success");
+        onSuccess(); // Notify parent that password is set (updates hasPassword state)
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
@@ -326,22 +336,25 @@ function PasswordChangeForm() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-2">
+        {hasPassword && (
+          <>
+            <label className="block space-y-2 col-span-full sm:col-span-1">
+              <span className="text-[10px] uppercase font-black tracking-widest text-white/40 ml-1">Ancien mot de passe</span>
+              <input
+                type="password"
+                required
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="w-full h-12 bg-black/40 border border-white/5 rounded-xl px-4 text-white outline-none focus:border-indigo-500/50 transition-all font-medium"
+                placeholder="••••••••"
+              />
+            </label>
+            <div className="hidden sm:block" /> {/* Spacer to force new row */}
+          </>
+        )}
+
         <label className="block space-y-2 col-span-full sm:col-span-1">
-          <span className="text-[10px] uppercase font-black tracking-widest text-white/40 ml-1">Ancien mot de passe</span>
-          <input
-            type="password"
-            required
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            className="w-full h-12 bg-black/40 border border-white/5 rounded-xl px-4 text-white outline-none focus:border-indigo-500/50 transition-all font-medium"
-            placeholder="••••••••"
-          />
-        </label>
-
-        <div className="hidden sm:block" /> {/* Spacer */}
-
-        <label className="block space-y-2">
           <span className="text-[10px] uppercase font-black tracking-widest text-white/40 ml-1">Nouveau mot de passe</span>
           <input
             type="password"
@@ -353,7 +366,7 @@ function PasswordChangeForm() {
           />
         </label>
 
-        <label className="block space-y-2">
+        <label className="block space-y-2 col-span-full sm:col-span-1">
           <span className="text-[10px] uppercase font-black tracking-widest text-white/40 ml-1">Confirmer nouveau</span>
           <input
             type="password"
@@ -372,7 +385,7 @@ function PasswordChangeForm() {
           disabled={status === "loading"}
           className="px-8 py-3 rounded-2xl bg-white text-black font-black uppercase tracking-widest text-xs hover:bg-indigo-500 hover:text-white transition-all disabled:opacity-50 active:scale-95"
         >
-          {status === "loading" ? "Chargement..." : "Changer le mot de passe"}
+          {status === "loading" ? "Chargement..." : (hasPassword ? "Changer le mot de passe" : "Créer le mot de passe")}
         </button>
       </div>
     </form>

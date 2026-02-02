@@ -16,8 +16,9 @@ import ImageCropper from "@/components/ImageCropper";
 import getCroppedImg from "@/lib/cropImage";
 import { moroccanCities, CITY_NEIGHBORHOODS, DRESS_CODES, AGE_POLICIES, PAYMENT_METHODS } from "@/lib/constants";
 import NotificationModal from "@/components/ui/NotificationModal";
+import TimePicker from "@/components/ui/TimePicker";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const TIME_OPTIONS = (() => {
     const times = [];
@@ -65,6 +66,7 @@ export default function VenueWizardPage() {
 
     // Wizard State
     const [currentStep, setCurrentStep] = useState(1);
+    const [completedStep, setCompletedStep] = useState(0); // Highest step saved to DB
     const TOTAL_STEPS = 5;
     const [isDirty, setIsDirty] = useState(false);
 
@@ -87,23 +89,8 @@ export default function VenueWizardPage() {
         setNotification(prev => ({ ...prev, isOpen: false }));
     };
 
-    // Persistence: Restore ID & Step
-    // Persistence: Restore ID & Step
-    useEffect(() => {
-        // We REMOVED auto-restore of ID from localStorage to force fresh start on new entry.
-        // User must click "Resume" from dashboard to get the ID in URL.
 
-        // Only restore step from localStorage on initial page load with URL param
-        if (urlVenueId && !isSavingRef.current) {
-            const savedStep = localStorage.getItem(`agora_editor_step_${urlVenueId}`);
-            if (savedStep) {
-                const s = parseInt(savedStep);
-                if (!isNaN(s) && s >= 1 && s <= TOTAL_STEPS) setCurrentStep(s);
-            }
-        }
-    }, [urlVenueId]); // Only run on URL param change, not on programmatic venueId changes
-
-    // Persistence: Save ID & Step
+    // Persistence: Save ID & Step (write-only, for session continuity)
     useEffect(() => {
         if (venueId) {
             localStorage.setItem("agora_last_venue_id", venueId);
@@ -119,9 +106,13 @@ export default function VenueWizardPage() {
 
         if (urlVenueId !== venueId) setVenueId(urlVenueId);
 
+        console.log(`🔄 Hydrating venue data for ID: ${urlVenueId}`);
+
         getVenueDraft(urlVenueId).then((result) => {
             if (result && result.venue) {
                 const v = result.venue as any;
+
+                console.log(`📖 Loaded from DB: wizardStep=${v.wizardStep}`);
 
                 // Helper to split phone
                 let loadedPrefix = "+212";
@@ -143,35 +134,34 @@ export default function VenueWizardPage() {
                 }
 
                 // Helper to parse Schedule
-                let loadedTimeStart = "12:00";
-                let loadedTimeEnd = "00:00";
-                let loadedDayStart = "Monday";
-                let loadedDayEnd = "Sunday";
-
-                if (v.weeklySchedule) {
-                    const ws = v.weeklySchedule;
-                    if (ws.startHour) loadedTimeStart = ws.startHour;
-                    if (ws.endHour) loadedTimeEnd = ws.endHour;
-                    if (ws.dayStart) loadedDayStart = ws.dayStart;
-                    if (ws.dayEnd) loadedDayEnd = ws.dayEnd;
-                } else if (v.openingHours) {
-                    const parts = v.openingHours.split(" - ");
-                    if (parts.length === 2) {
-                        loadedTimeStart = parts[0];
-                        loadedTimeEnd = parts[1];
-                    }
+                let loadedSchedule = null;
+                if (v.weeklySchedule && Array.isArray(v.weeklySchedule) && v.weeklySchedule.length === 7) {
+                    loadedSchedule = v.weeklySchedule;
                 }
 
 
                 // Restore Step from DB if valid (but NOT if we're currently saving)
                 if (!isSavingRef.current) {
+                    console.log(`🔍 Processing wizardStep from DB: ${v.wizardStep}`);
+
                     if (v.wizardStep && v.wizardStep >= 1 && v.wizardStep <= TOTAL_STEPS) {
+                        console.log(`✅ Setting currentStep to ${v.wizardStep} from database`);
                         setCurrentStep(v.wizardStep);
+                        // If we're on step N, then steps 1 through N-1 are completed
+                        const completed = Math.max(0, v.wizardStep - 1);
+                        setCompletedStep(completed);
+                        console.log(`✅ Setting completedStep to ${completed}`);
                     } else if (v.wizardStep && v.wizardStep > TOTAL_STEPS) {
-                        // If finished, maybe go to last step or redirect?
-                        // For now, let's stick to last step or 1 if invalid
+                        // If finished, go to last step
+                        console.log(`✅ Venue completed (step ${v.wizardStep}), going to step ${TOTAL_STEPS}`);
                         setCurrentStep(TOTAL_STEPS);
+                        setCompletedStep(TOTAL_STEPS); // All steps completed
+                    } else {
+                        console.log(`⚠️ No valid wizardStep in DB (value: ${v.wizardStep}), staying at step 1`);
+                        setCompletedStep(0); // Nothing completed yet
                     }
+                } else {
+                    console.log(`⏸️ Skipping step restoration (currently saving)`);
                 }
 
                 // Populate Form
@@ -182,6 +172,7 @@ export default function VenueWizardPage() {
                     address: v.address || "",
                     city: v.city?.name || "",
                     neighborhood: v.neighborhood || "",
+                    tagline: v.tagline || "", // Populate Tagline
                     phone: loadedPhone,
                     phonePrefix: loadedPrefix,
                     email: v.email || "",
@@ -190,11 +181,6 @@ export default function VenueWizardPage() {
                     tiktokUrl: v.tiktokUrl || "",
                     wazeUrl: v.wazeUrl || "",
                     locationUrl: v.locationUrl || "",
-
-                    timeStart: loadedTimeStart,
-                    timeEnd: loadedTimeEnd,
-                    dayStart: loadedDayStart,
-                    dayEnd: loadedDayEnd,
 
                     coverImageUrl: v.coverImageUrl || "",
                     category: v.mainCategory,
@@ -209,6 +195,26 @@ export default function VenueWizardPage() {
                     reservationUrl: v.reservationUrl || "",
                     menuUrl: v.menuUrl || "",
                 }));
+
+                // Populate Schedule
+                if (loadedSchedule) {
+                    setScheduleRows(loadedSchedule);
+                    // Check if schedule is advanced (any day different from Mon, or strictly checks variation)
+                    const first = loadedSchedule[0];
+                    const isAdvanced = loadedSchedule.some((r: any) =>
+                        r.open !== first.open || r.close !== first.close || r.closed !== first.closed
+                    );
+                    setIsAdvancedSchedule(isAdvanced);
+
+                    // Try to detect simple start/end days
+                    const openDays = loadedSchedule.filter((r: any) => !r.closed);
+                    if (openDays.length > 0) {
+                        setSimpleStartDay(openDays[0].day);
+                        // Find last open day, handling wrap-around logic is hard here, so simpler heuristic:
+                        // Just take the last one in the list for now.
+                        setSimpleEndDay(openDays[openDays.length - 1].day);
+                    }
+                }
 
                 // Populate Multi-selects
                 if (v.cuisines) setSelectedCuisines(v.cuisines.map((c: any) => c.cuisine.name));
@@ -251,12 +257,6 @@ export default function VenueWizardPage() {
         wazeUrl: "",
         locationUrl: "",
 
-        // Schedule
-        dayStart: "",
-        dayEnd: "",
-        timeStart: "",
-        timeEnd: "",
-
         coverImageUrl: "",
         category: "",
         subcategory: "",
@@ -270,6 +270,80 @@ export default function VenueWizardPage() {
         reservationUrl: "",
         menuUrl: "",
     });
+
+    // Schedule State: 7 Fixed Rows for Mon-Sun
+    const [isAdvancedSchedule, setIsAdvancedSchedule] = useState(false);
+    const [simpleStartDay, setSimpleStartDay] = useState("Mon");
+    const [simpleEndDay, setSimpleEndDay] = useState("Sun");
+
+    const [scheduleRows, setScheduleRows] = useState<any[]>(() => {
+        return DAYS.map(day => ({
+            day: day,
+            open: "09:00",
+            close: "00:00",
+            closed: false
+        }));
+    });
+
+    const updateSimpleSchedule = (updates: { start?: string, end?: string, open?: string, close?: string, is24h?: boolean }) => {
+        const sDay = updates.start || simpleStartDay;
+        const eDay = updates.end || simpleEndDay;
+
+        // If 24h is toggled ON, force 00:00 - 00:00 (next day) or 00:00-23:59.
+        // Let's use 06:00 to 06:00 or just keep inputs as is but override logic? 
+        // Best approach: updates.is24h sets time to "00:00" - "00:00" 
+
+        let sTime = updates.open || scheduleRows.find(r => !r.closed)?.open || "09:00";
+        let eTime = updates.close || scheduleRows.find(r => !r.closed)?.close || "00:00";
+
+        if (updates.is24h) {
+            sTime = "00:00";
+            eTime = "00:00"; // Assuming 00:00 to 00:00 implies 24h cycle
+        }
+
+        // Update state helpers
+        if (updates.start) setSimpleStartDay(updates.start);
+        if (updates.end) setSimpleEndDay(updates.end);
+
+        // Calculate indices
+        const sIdx = DAYS.indexOf(sDay);
+        const eIdx = DAYS.indexOf(eDay);
+
+        const newRows = scheduleRows.map((row, idx) => {
+            // Check if idx is in range
+            let inRange = false;
+            if (sIdx <= eIdx) {
+                inRange = idx >= sIdx && idx <= eIdx;
+            } else {
+                inRange = idx >= sIdx || idx <= eIdx; // Wrap-around case
+            }
+
+            return {
+                ...row,
+                open: sTime,
+                close: eTime,
+                closed: !inRange
+            };
+        });
+
+        setScheduleRows(newRows);
+        setIsDirty(true);
+    };
+
+    const updateScheduleRow = (idx: number, field: string, value: any) => {
+        const newRows = [...scheduleRows];
+        newRows[idx][field] = value;
+        setScheduleRows(newRows);
+        setIsDirty(true);
+    };
+
+    const toggleClosed = (idx: number) => {
+        const newRows = [...scheduleRows];
+        newRows[idx].closed = !newRows[idx].closed;
+        setScheduleRows(newRows);
+        setIsDirty(true);
+    };
+
 
     const [gallery, setGallery] = useState<any[]>([]);
     const [menuGallery, setMenuGallery] = useState<any[]>([]);
@@ -344,10 +418,10 @@ export default function VenueWizardPage() {
     };
 
     // 2. Crop Saved -> Upload Blob
-    const onCoverCropComplete = async (croppedAreaPixels: any) => {
+    const onCoverCropComplete = async (croppedAreaPixels: any, rotation: number = 0) => {
         if (!coverCropState) return;
         try {
-            const croppedBlob = await getCroppedImg(coverCropState.src, croppedAreaPixels);
+            const croppedBlob = await getCroppedImg(coverCropState.src, croppedAreaPixels, rotation);
             if (croppedBlob) {
                 // Upload this blob
                 await uploadCoverBlob(croppedBlob);
@@ -388,25 +462,156 @@ export default function VenueWizardPage() {
         return result.secure_url;
     }
 
-    function getDaysRange(start: string, end: string) {
-        const startIndex = DAYS.indexOf(start);
-        const endIndex = DAYS.indexOf(end);
-        if (startIndex === -1 || endIndex === -1) return [];
-
-        if (startIndex <= endIndex) {
-            return DAYS.slice(startIndex, endIndex + 1);
-        } else {
-            // Wrap around (e.g. Friday to Tuesday)
-            return [...DAYS.slice(startIndex), ...DAYS.slice(0, endIndex + 1)];
-        }
-    }
-
     async function handleSaveStep(nextStep?: number) {
         setSaving(true);
         isSavingRef.current = true;
 
+        // MANDATORY VALIDATION - ALWAYS RUNS (BUT ONLY WHEN MOVING FORWARD)
+        // User cannot proceed until all required fields IF moving forward.
+        // Moving backward is allowed to review previous steps.
+        // ============================================
+
+        const isMovingForward = nextStep === undefined || nextStep > currentStep;
+
+        if (isMovingForward) {
+            // Step 1: Validation (Mandatory Fields)
+            if (currentStep === 1) {
+                const missingFields = [];
+                if (!data.name?.trim()) missingFields.push("Venue Name");
+                if (!data.category) missingFields.push("Primary Category");
+                if (!data.subcategory) missingFields.push("Subcategory");
+                if (!data.city) missingFields.push("City");
+                if (!data.address?.trim()) missingFields.push("Full Street Address");
+                if (!data.phone?.trim()) missingFields.push("Phone Number");
+
+                // Schedule Validation: At least one day must be open
+                const hasOpenDays = scheduleRows.some(row => !row.closed);
+                if (!hasOpenDays) {
+                    missingFields.push("Opening Hours (Venue must be open at least one day)");
+                }
+
+                if (missingFields.length > 0) {
+                    showNotification("Missing Information", `Please complete ALL mandatory fields before proceeding:\n\n• ${missingFields.join('\n• ')}`, "warning");
+                    setSaving(false);
+                    isSavingRef.current = false;
+                    return;
+                }
+
+                // Validate Phone Format
+                if (data.phone) {
+                    const phoneDigits = data.phone.replace(/\D/g, ''); // strip spaces/dashes
+                    if (!phoneDigits.startsWith('0') || phoneDigits.length !== 10) {
+                        showNotification("Invalid Phone Number", "Phone must start with '0' and be 10 digits (e.g. 0612345678).", "error");
+                        setSaving(false);
+                        isSavingRef.current = false;
+                        return;
+                    }
+                }
+            }
+
+            // Step 2: Media Validation (Cover Photo + Minimum 5 Gallery Photos - MANDATORY)
+            // Note: Menu is OPTIONAL
+            if (currentStep === 2) {
+                const mediaErrors = [];
+
+                // Cover Photo is MANDATORY
+                if (!data.coverImageUrl || !data.coverImageUrl.trim()) {
+                    mediaErrors.push("Cover Photo is REQUIRED - This will be the main image shown on your venue card");
+                }
+
+                // Minimum 5 gallery items is MANDATORY
+                if (gallery.length < 5) {
+                    mediaErrors.push(`Gallery must have at least 5 photos/videos (you have ${gallery.length})`);
+                }
+
+                if (mediaErrors.length > 0) {
+                    showNotification(
+                        "⚠️ Media Required",
+                        `You cannot proceed until you complete these requirements:\n\n• ${mediaErrors.join('\n• ')}\n\n(Menu upload is optional)`,
+                        "error"
+                    );
+                    setSaving(false);
+                    isSavingRef.current = false;
+                    return;
+                }
+            }
+
+            // Step 3: Category-Dependent Validation (Vibe & Atmosphere)
+            if (currentStep === 3) {
+                const category = data.category || '';
+                const missingFields: string[] = [];
+
+                // Get requirements based on category
+                if (category === 'CAFE') {
+                    // Café requires: Vibe only
+                    if (!selectedVibes || selectedVibes.length === 0) {
+                        missingFields.push("Vibe/Atmosphere (at least 1 required for Café)");
+                    }
+                } else if (category === 'RESTAURANT') {
+                    // Restaurant requires: Cuisine only
+                    if (!selectedCuisines || selectedCuisines.length === 0) {
+                        missingFields.push("Cuisine (at least 1 required for Restaurant)");
+                    }
+                } else if (category === 'NIGHTLIFE_BARS' || category === 'CLUBS_PARTY') {
+                    // Nightlife/Clubs require: Vibe + Music
+                    if (!selectedVibes || selectedVibes.length === 0) {
+                        missingFields.push("Vibe/Atmosphere (at least 1 required for " + category + ")");
+                    }
+                    if (!selectedMusic || selectedMusic.length === 0) {
+                        missingFields.push("Music Type (at least 1 required for " + category + ")");
+                    }
+                }
+                // Events, Activities & Fun, Wellness & Health: No mandatory fields
+
+                if (missingFields.length > 0) {
+                    showNotification(
+                        "⚠️ Required for " + category,
+                        `Please complete the following fields:\n\n• ${missingFields.join('\n• ')}`,
+                        "error"
+                    );
+                    setSaving(false);
+                    isSavingRef.current = false;
+                    return;
+                }
+            }
+
+            // Step 4: Reservation & Policies Validation
+            if (currentStep === 4 || nextStep === undefined) {
+                const step4Errors = [];
+
+                // 1. Mandatory Policies
+                if (!data.dressCode) step4Errors.push("Dress Code is required");
+                if (!data.agePolicy) step4Errors.push("Age Policy is required");
+                if (!selectedPayments || selectedPayments.length === 0) step4Errors.push("At least one Payment Method is required");
+
+                // 2. Conditional Reservation Fields
+                if (data.reservationPolicy === 'PHONE_WHATSAPP') {
+                    if (!data.reservationPhoneNumber || data.reservationPhoneNumber.length < 5) {
+                        step4Errors.push("Phone Number is required for Phone/WhatsApp bookings");
+                    }
+                }
+                if (data.reservationPolicy === 'EXTERNAL_LINK') {
+                    if (!data.reservationUrl || data.reservationUrl.length < 5) { // Basic length check
+                        step4Errors.push("Booking URL is required for External Website bookings");
+                    }
+                }
+
+                if (step4Errors.length > 0) {
+                    showNotification(
+                        "Missing Details",
+                        `Please complete the following:\n\n• ${step4Errors.join('\n• ')}`,
+                        "warning"
+                    );
+                    setSaving(false);
+                    isSavingRef.current = false;
+                    return;
+                }
+            }
+        }
+
         // OPTIMIZATION: If we already have a venue ID (draft) and nothing changed,
         // just move to next step without saving/delay.
+        // MOVED AFTER VALIDATION TO PREVENT JUMPING STEPS WITH INVALID DATA
         if (venueId && !isDirty && nextStep) {
             console.log("Optimization: Nothing changed, moving to next step directly.");
             if (nextStep > TOTAL_STEPS) {
@@ -417,146 +622,6 @@ export default function VenueWizardPage() {
             setSaving(false);
             isSavingRef.current = false;
             return;
-        }
-        // MANDATORY VALIDATION - ALWAYS RUNS
-        // User cannot proceed until all required fields
-        // ============================================
-
-        // Step 1: Validation (Mandatory Fields)
-        if (currentStep === 1) {
-            const missingFields = [];
-            if (!data.name?.trim()) missingFields.push("Venue Name");
-            if (!data.category) missingFields.push("Primary Category");
-            if (!data.subcategory) missingFields.push("Subcategory");
-            if (!data.city) missingFields.push("City");
-            if (!data.address?.trim()) missingFields.push("Full Street Address");
-            if (!data.phone?.trim()) missingFields.push("Phone Number");
-
-            // Mandatory Schedule Fields
-            if (!data.dayStart) missingFields.push("Opening Day (From)");
-            if (!data.dayEnd) missingFields.push("Opening Day (To)");
-            if (!data.timeStart) missingFields.push("Opening Time (Open At)");
-            if (!data.timeEnd) missingFields.push("Closing Time (Close At)");
-
-            if (missingFields.length > 0) {
-                showNotification("Missing Information", `Please complete ALL mandatory fields before proceeding:\n\n• ${missingFields.join('\n• ')}`, "warning");
-                setSaving(false);
-                isSavingRef.current = false;
-                return;
-            }
-
-            // Validate Phone Format
-            if (data.phone) {
-                const phoneDigits = data.phone.replace(/\D/g, ''); // strip spaces/dashes
-                if (!phoneDigits.startsWith('0') || phoneDigits.length !== 10) {
-                    showNotification("Invalid Phone Number", "Phone must start with '0' and be 10 digits (e.g. 0612345678).", "error");
-                    setSaving(false);
-                    isSavingRef.current = false;
-                    return;
-                }
-            }
-        }
-
-        // Step 2: Media Validation (Cover Photo + Minimum 5 Gallery Photos - MANDATORY)
-        // Note: Menu is OPTIONAL
-        if (currentStep === 2) {
-            const mediaErrors = [];
-
-            // Cover Photo is MANDATORY
-            if (!data.coverImageUrl || !data.coverImageUrl.trim()) {
-                mediaErrors.push("Cover Photo is REQUIRED - This will be the main image shown on your venue card");
-            }
-
-            // Minimum 5 gallery items is MANDATORY
-            if (gallery.length < 5) {
-                mediaErrors.push(`Gallery must have at least 5 photos/videos (you have ${gallery.length})`);
-            }
-
-            if (mediaErrors.length > 0) {
-                showNotification(
-                    "⚠️ Media Required",
-                    `You cannot proceed until you complete these requirements:\n\n• ${mediaErrors.join('\n• ')}\n\n(Menu upload is optional)`,
-                    "error"
-                );
-                setSaving(false);
-                isSavingRef.current = false;
-                return;
-            }
-        }
-
-        // Step 3: Category-Dependent Validation (Vibe & Atmosphere)
-        if (currentStep === 3) {
-            const category = data.category || '';
-            const missingFields: string[] = [];
-
-            // Get requirements based on category
-            if (category === 'CAFE') {
-                // Café requires: Cuisine + Vibe
-                if (!selectedCuisines || selectedCuisines.length === 0) {
-                    missingFields.push("Cuisine (at least 1 required for Café)");
-                }
-                if (!selectedVibes || selectedVibes.length === 0) {
-                    missingFields.push("Vibe/Atmosphere (at least 1 required for Café)");
-                }
-            } else if (category === 'RESTAURANT') {
-                // Restaurant requires: Cuisine only
-                if (!selectedCuisines || selectedCuisines.length === 0) {
-                    missingFields.push("Cuisine (at least 1 required for Restaurant)");
-                }
-            } else if (category === 'NIGHTLIFE_BARS' || category === 'CLUBS_PARTY') {
-                // Nightlife/Clubs require: Vibe + Music
-                if (!selectedVibes || selectedVibes.length === 0) {
-                    missingFields.push("Vibe/Atmosphere (at least 1 required for " + category + ")");
-                }
-                if (!selectedMusic || selectedMusic.length === 0) {
-                    missingFields.push("Music Type (at least 1 required for " + category + ")");
-                }
-            }
-            // Events, Activities & Fun, Wellness & Health: No mandatory fields
-
-            if (missingFields.length > 0) {
-                showNotification(
-                    "⚠️ Required for " + category,
-                    `Please complete the following fields:\n\n• ${missingFields.join('\n• ')}`,
-                    "error"
-                );
-                setSaving(false);
-                isSavingRef.current = false;
-                return;
-            }
-        }
-
-        // Step 4: Reservation & Policies Validation
-        if (currentStep === 4 || nextStep === undefined) {
-            const step4Errors = [];
-
-            // 1. Mandatory Policies
-            if (!data.dressCode) step4Errors.push("Dress Code is required");
-            if (!data.agePolicy) step4Errors.push("Age Policy is required");
-            if (!selectedPayments || selectedPayments.length === 0) step4Errors.push("At least one Payment Method is required");
-
-            // 2. Conditional Reservation Fields
-            if (data.reservationPolicy === 'PHONE_WHATSAPP') {
-                if (!data.reservationPhoneNumber || data.reservationPhoneNumber.length < 5) {
-                    step4Errors.push("Phone Number is required for Phone/WhatsApp bookings");
-                }
-            }
-            if (data.reservationPolicy === 'EXTERNAL_LINK') {
-                if (!data.reservationUrl || data.reservationUrl.length < 5) { // Basic length check
-                    step4Errors.push("Booking URL is required for External Website bookings");
-                }
-            }
-
-            if (step4Errors.length > 0) {
-                showNotification(
-                    "Missing Details",
-                    `Please complete the following:\n\n• ${step4Errors.join('\n• ')}`,
-                    "warning"
-                );
-                setSaving(false);
-                isSavingRef.current = false;
-                return;
-            }
         }
 
         let currentScenes = floorPlanScenes;
@@ -593,16 +658,21 @@ export default function VenueWizardPage() {
             finalPhone = `${data.phonePrefix} ${phoneWithoutLeadingZero}`;
         }
 
+        // Construct openingHours string
+        // Format: "Mon: 09:00-22:00, Tue: Closed, ..." (Human Readable)
+        const formattedHours = scheduleRows.map(row => {
+            if (row.closed) return `${row.day}: Closed`;
+            return `${row.day}: ${row.open} - ${row.close}`;
+        }).join(", ");
+
         const submitData = {
             ...data,
             // Combine Prefix & Phone for backend
             phone: finalPhone,
 
             // Construct schedule items
-            startHour: data.timeStart,
-            endHour: data.timeEnd,
-            openingDays: getDaysRange(data.dayStart, data.dayEnd),
-            openingHours: `${data.timeStart} - ${data.timeEnd}`, // Legacy/Display format
+            openingHours: formattedHours,
+            weeklySchedule: scheduleRows,
 
             // Mapping Socials
             instagramUrl: data.instagram,
@@ -618,8 +688,13 @@ export default function VenueWizardPage() {
             floorPlan: {
                 enabled: enableFloorPlan,
                 scenes: currentScenes
-            }
+            },
+            // Send next step as the new wizard step (backend will ensure it only increases)
+            wizardStep: nextStep ? nextStep : undefined
         };
+
+        // DEBUG: Log what we're sending
+        console.log(`🚀 Sending wizardStep=${submitData.wizardStep} (nextStep=${nextStep}, currentStep=${currentStep})`);
 
         try {
             let currentId = venueId;
@@ -652,6 +727,10 @@ export default function VenueWizardPage() {
                     router.push(`/business/dashboard?success=venue-created`);
                 } else {
                     setCurrentStep(nextStep);
+                    // Update completed step to be the one we just finished
+                    if (currentStep > completedStep) {
+                        setCompletedStep(currentStep);
+                    }
                 }
             }
         } catch (error) {
@@ -684,63 +763,26 @@ export default function VenueWizardPage() {
                 type={notification.type}
             />
 
-            {/* Top Bar (Progress) */}
-            <div className="sticky top-0 bg-black/40 backdrop-blur-md border-b border-white/5 z-50 supports-[backdrop-filter]:bg-black/20">
-                <div className="max-w-5xl mx-auto px-4 py-4">
-                    <div className="flex items-center justify-between mb-4">
-                        <button onClick={() => currentStep > 1 ? setCurrentStep(currentStep - 1) : router.back()} className="text-zinc-400 hover:text-white flex items-center gap-2">
-                            <ChevronLeft className="w-5 h-5" />
-                            {currentStep === 1 ? 'Exit' : 'Back'}
-                        </button>
 
-                        {/* Interactive Stepper */}
-                        <div className="flex items-center gap-2">
-                            {[1, 2, 3, 4, 5].map((step) => (
-                                <button
-                                    key={step}
-                                    onClick={() => {
-                                        // Only allow jumping if we have a venueId (draft started)
-                                        if (venueId) handleSaveStep(step);
-                                    }}
-                                    disabled={!venueId}
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all
-                                        ${currentStep === step
-                                            ? 'bg-white text-black scale-110 shadow-lg'
-                                            : step < currentStep
-                                                ? 'bg-zinc-800 text-green-500 hover:bg-zinc-700'
-                                                : 'bg-zinc-900 text-zinc-600 hover:bg-zinc-800'
-                                        }
-                                    `}
-                                >
-                                    {step < currentStep ? <Check className="w-3.5 h-3.5" /> : step}
-                                </button>
-                            ))}
-                        </div>
+            {/* Top Bar Removed as requested - Progress is now in the bottom bar */}
 
-                        <button onClick={() => handleSaveStep(currentStep + 1)} disabled={saving} className="bg-white text-black px-6 py-2 rounded-full font-bold text-sm hover:scale-105 transition-transform disabled:opacity-50">
-                            {saving ? 'Saving...' : (currentStep === TOTAL_STEPS ? 'Finish' : 'Next Step')}
-                        </button>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${(currentStep / TOTAL_STEPS) * 100}%` }} />
-                    </div>
-                </div>
+            {/* DEBUG BANNER - Remove after testing */}
+            <div className="bg-yellow-500/20 border-b border-yellow-500 p-2 text-center text-xs font-mono">
+                DEBUG: currentStep={currentStep} | completedStep={completedStep} | venueId={venueId}
             </div>
 
             {/* Main Content */}
-            <div className={`flex-1 w-full mx-auto p-6 pb-20 transition-all duration-500 ${currentStep === 5 ? 'max-w-[95%]' : 'max-w-4xl'}`}>
+            <div className={`flex-1 w-full mx-auto p-4 md:p-6 pb-20 transition-all duration-500 ${currentStep === 5 ? 'max-w-[95%]' : 'max-w-4xl'}`}>
 
                 {/* STEP 1: ESSENTIALS */}
                 {currentStep === 1 && (
                     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
                         <div className="text-center space-y-2">
-                            <h1 className="text-3xl font-bold">Let's start with the basics</h1>
+                            <h1 className="text-2xl md:text-3xl font-bold">Let's start with the basics</h1>
                             <p className="text-zinc-400">Where is your venue located and how can people contact you?</p>
                         </div>
 
-                        <div className="bg-zinc-900/50 p-8 rounded-2xl border border-white/5 space-y-6">
+                        <div className="bg-zinc-900/50 p-4 md:p-8 rounded-2xl border border-white/5 space-y-6">
                             {/* Basics */}
                             <div>
                                 <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Venue Name <span className="text-red-500">*</span></label>
@@ -752,7 +794,7 @@ export default function VenueWizardPage() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Primary Category <span className="text-red-500">*</span></label>
                                     <select
@@ -781,7 +823,7 @@ export default function VenueWizardPage() {
                             {/* Location (City & Neighborhood) */}
                             <div>
                                 <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Location <span className="text-red-500">*</span></label>
-                                <div className="grid grid-cols-2 gap-4 mb-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                                     <select
                                         value={data.city} onChange={e => {
                                             updateField("city", e.target.value);
@@ -816,7 +858,7 @@ export default function VenueWizardPage() {
                                     className="w-full bg-zinc-800 rounded-lg p-3 outline-none mb-3"
                                 />
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="flex items-center gap-2 bg-zinc-800 rounded-lg px-3 py-1">
                                         <MapPin className="w-5 h-5 text-indigo-400" />
                                         <input
@@ -843,7 +885,7 @@ export default function VenueWizardPage() {
                             {/* Contact & Hours */}
                             <div>
                                 <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Contact & Schedule <span className="text-red-500">*</span></label>
-                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                     <div className="flex items-center gap-2 bg-zinc-800 rounded-lg px-3 py-1">
                                         <Phone className="w-5 h-5 text-green-400" />
 
@@ -875,58 +917,192 @@ export default function VenueWizardPage() {
                                     </div>
                                 </div>
 
-                                <div className="bg-zinc-800 rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-
-                                    {/* Days */}
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex-1">
-                                            <label className="text-[10px] text-zinc-500 uppercase font-bold mb-1 block">From Day <span className="text-red-500">*</span></label>
-                                            <select
-                                                value={data.dayStart} onChange={e => updateField("dayStart", e.target.value)}
-                                                className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm outline-none"
-                                            >
-                                                <option value="">Select...</option>
-                                                {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                                            </select>
-                                        </div>
-                                        <ArrowRight className="w-4 h-4 text-zinc-500 mt-5" />
-                                        <div className="flex-1">
-                                            <label className="text-[10px] text-zinc-500 uppercase font-bold mb-1 block">To Day <span className="text-red-500">*</span></label>
-                                            <select
-                                                value={data.dayEnd} onChange={e => updateField("dayEnd", e.target.value)}
-                                                className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm outline-none"
-                                            >
-                                                <option value="">Select...</option>
-                                                {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                                            </select>
-                                        </div>
+                                <div className="bg-zinc-800 rounded-xl p-4">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h4 className="text-sm font-semibold text-white">Opening Hours</h4>
+                                        <div className="text-xs text-zinc-500 italic">Set your weekly schedule</div>
                                     </div>
 
-                                    {/* Hours */}
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex-1">
-                                            <label className="text-[10px] text-zinc-500 uppercase font-bold mb-1 block">Open At <span className="text-red-500">*</span></label>
-                                            <select
-                                                value={data.timeStart} onChange={e => updateField("timeStart", e.target.value)}
-                                                className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm outline-none"
-                                            >
-                                                <option value="">Select...</option>
-                                                {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                                            </select>
+                                    <div className="space-y-4">
+                                        {/* Toggle */}
+                                        <div className="flex items-center justify-between bg-zinc-900 border border-zinc-700 p-3 rounded-lg">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-full ${isAdvancedSchedule ? 'bg-indigo-500/20 text-indigo-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                                                    <Clock className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-bold text-white">Daily Schedule</div>
+                                                    <div className="text-xs text-zinc-500">Configure different hours for specific days</div>
+                                                </div>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isAdvancedSchedule}
+                                                    onChange={() => setIsAdvancedSchedule(!isAdvancedSchedule)}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                            </label>
                                         </div>
-                                        <ArrowRight className="w-4 h-4 text-zinc-500 mt-5" />
-                                        <div className="flex-1">
-                                            <label className="text-[10px] text-zinc-500 uppercase font-bold mb-1 block">Close At <span className="text-red-500">*</span></label>
-                                            <select
-                                                value={data.timeEnd} onChange={e => updateField("timeEnd", e.target.value)}
-                                                className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm outline-none"
-                                            >
-                                                <option value="">Select...</option>
-                                                {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
 
+                                        {/* Content */}
+                                        {isAdvancedSchedule ? (
+                                            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                                {scheduleRows.map((row, idx) => (
+                                                    <div key={row.day} className={`flex flex-col md:flex-row gap-3 items-center bg-zinc-900/50 p-2 rounded-lg border ${row.closed ? 'border-red-900/20 opacity-60' : 'border-white/5'}`}>
+
+                                                        {/* Day & Toggle */}
+                                                        <div className="flex items-center justify-between w-full md:w-32">
+                                                            <span className="font-semibold text-zinc-300 w-12 text-sm">{row.day}</span>
+                                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                                <div className={`w-8 h-4 rounded-full transition-colors relative ${!row.closed ? 'bg-indigo-600' : 'bg-zinc-600'}`}>
+                                                                    <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${!row.closed ? 'left-4.5' : 'left-0.5'}`} style={{ left: !row.closed ? 'calc(100% - 14px)' : '2px' }}></div>
+                                                                </div>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="hidden"
+                                                                    checked={!row.closed}
+                                                                    onChange={() => toggleClosed(idx)}
+                                                                />
+                                                            </label>
+                                                        </div>
+
+                                                        <div className="hidden md:block w-px h-6 bg-white/10 mx-2"></div>
+
+                                                        {/* Time Pickers */}
+                                                        {row.closed ? (
+                                                            <div className="flex-1 text-sm text-zinc-500 italic text-center md:text-left">
+                                                                Closed
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 w-full animate-in fade-in">
+                                                                {row.open === "00:00" && row.close === "00:00" ? (
+                                                                    <div className="flex-1 flex items-center justify-center text-xs font-bold text-green-400 bg-green-900/20 px-3 py-2 rounded border border-green-900/50">
+                                                                        OPEN 24 HOURS
+                                                                    </div>
+                                                                ) : (
+                                                                    <>
+                                                                        <div className="flex flex-col gap-1 flex-1">
+                                                                            <span className="sm:hidden text-[10px] text-zinc-500 font-bold uppercase">Open</span>
+                                                                            <TimePicker
+                                                                                value={row.open}
+                                                                                onChange={(val) => updateScheduleRow(idx, 'open', val)}
+                                                                                className="w-full"
+                                                                            />
+                                                                        </div>
+                                                                        <span className="hidden sm:block text-zinc-500">-</span>
+                                                                        <div className="flex flex-col gap-1 flex-1">
+                                                                            <span className="sm:hidden text-[10px] text-zinc-500 font-bold uppercase">Close</span>
+                                                                            <TimePicker
+                                                                                value={row.close}
+                                                                                onChange={(val) => updateScheduleRow(idx, 'close', val)}
+                                                                                className="w-full"
+                                                                            />
+                                                                        </div>
+                                                                    </>
+                                                                )}
+
+                                                                {/* 24h Toggle */}
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const is24h = row.open === "00:00" && row.close === "00:00";
+                                                                        if (is24h) {
+                                                                            updateScheduleRow(idx, 'open', "09:00");
+                                                                            updateScheduleRow(idx, 'close', "00:00");
+                                                                        } else {
+                                                                            updateScheduleRow(idx, 'open', "00:00");
+                                                                            updateScheduleRow(idx, 'close', "00:00");
+                                                                        }
+                                                                    }}
+                                                                    className={`sm:ml-2 text-[10px] px-2 py-2 sm:py-1 rounded border transition-colors w-full sm:w-auto text-center ${row.open === "00:00" && row.close === "00:00"
+                                                                        ? "bg-green-500/20 border-green-500/50 text-green-300"
+                                                                        : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700"
+                                                                        }`}
+                                                                >
+                                                                    24h
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="bg-zinc-900/50 border border-zinc-700 p-4 rounded-xl flex flex-col md:flex-row items-center gap-6 animate-in fade-in">
+                                                {/* Days Range - Expanded */}
+                                                <div className="flex items-center gap-4 flex-1 w-full">
+                                                    <div className="flex flex-col flex-1">
+                                                        <label className="text-[10px] uppercase font-bold text-zinc-500 mb-1">From <span className="text-red-500">*</span></label>
+                                                        <select
+                                                            value={simpleStartDay}
+                                                            onChange={(e) => updateSimpleSchedule({ start: e.target.value })}
+                                                            className="w-full bg-zinc-800 border border-zinc-600 rounded-lg p-2.5 text-sm text-white outline-none"
+                                                        >
+                                                            {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex flex-col flex-1">
+                                                        <label className="text-[10px] uppercase font-bold text-zinc-500 mb-1">To <span className="text-red-500">*</span></label>
+                                                        <select
+                                                            value={simpleEndDay}
+                                                            onChange={(e) => updateSimpleSchedule({ end: e.target.value })}
+                                                            className="w-full bg-zinc-800 border border-zinc-600 rounded-lg p-2.5 text-sm text-white outline-none"
+                                                        >
+                                                            {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {/* Divider */}
+                                                <div className="hidden md:block w-px h-12 bg-white/10"></div>
+
+                                                {/* Hours - Expanded */}
+                                                <div className="flex flex-col flex-1 w-full">
+                                                    {/* Inputs Row with Open 24h inline */}
+                                                    <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 transition-opacity ${scheduleRows.find(r => !r.closed)?.open === "00:00" && scheduleRows.find(r => !r.closed)?.close === "00:00" ? 'opacity-50 pointer-events-none' : 'opacity-100'
+                                                        }`}>
+                                                        <div className="flex flex-col flex-1 w-full">
+                                                            <label className="text-[10px] uppercase font-bold text-zinc-500 mb-1">Opens at <span className="text-red-500">*</span></label>
+                                                            <TimePicker
+                                                                className="w-full flex-1"
+                                                                value={scheduleRows.find(r => !r.closed)?.open || "09:00"}
+                                                                onChange={(val) => updateSimpleSchedule({ open: val })}
+                                                            />
+                                                        </div>
+
+                                                        {/* Divider / Arrow */}
+                                                        <div className="hidden sm:block text-zinc-500 font-medium pt-5">-</div>
+
+                                                        <div className="flex flex-col flex-1 w-full">
+                                                            <label className="text-[10px] uppercase font-bold text-zinc-500 mb-1">Closes at <span className="text-red-500">*</span></label>
+                                                            <TimePicker
+                                                                className="w-full flex-1"
+                                                                value={scheduleRows.find(r => !r.closed)?.close || "22:00"}
+                                                                onChange={(val) => updateSimpleSchedule({ close: val })}
+                                                            />
+                                                        </div>
+
+                                                        {/* Open 24h toggle - inline on the right */}
+                                                        <label className="flex items-center gap-1.5 cursor-pointer group whitespace-nowrap pt-5">
+                                                            <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${scheduleRows.find(r => !r.closed)?.open === "00:00" && scheduleRows.find(r => !r.closed)?.close === "00:00"
+                                                                ? "bg-green-500 border-green-500"
+                                                                : "border-zinc-600 group-hover:border-zinc-500"
+                                                                }`}>
+                                                                {(scheduleRows.find(r => !r.closed)?.open === "00:00" && scheduleRows.find(r => !r.closed)?.close === "00:00") && <Check className="w-2 h-2 text-black" strokeWidth={4} />}
+                                                            </div>
+                                                            <input
+                                                                type="checkbox"
+                                                                className="hidden"
+                                                                checked={scheduleRows.find(r => !r.closed)?.open === "00:00" && scheduleRows.find(r => !r.closed)?.close === "00:00"}
+                                                                onChange={(e) => updateSimpleSchedule({ is24h: e.target.checked })}
+                                                            />
+                                                            <span className="text-[10px] uppercase font-bold text-green-400 group-hover:text-green-300 selection:bg-none">24h</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
@@ -990,195 +1166,81 @@ export default function VenueWizardPage() {
                     </div>
                 )}
 
-                {/* STEP 2: LOOKS & DESC */}
+                {/* STEP 2: VISUALS */}
                 {currentStep === 2 && (
                     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
                         <div className="text-center space-y-2">
-                            <h1 className="text-3xl font-bold">Make it look good</h1>
-                            <p className="text-zinc-400">Upload your best photos to attract guests.</p>
-                            <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl inline-block">
-                                <p className="text-amber-400 text-sm font-medium">
-                                    <span className="text-red-500">*</span> Required: Cover Photo + Minimum 5 Gallery Images
-                                </p>
-                                <p className="text-zinc-500 text-xs mt-1">Menu upload is optional</p>
-                            </div>
+                            <h1 className="text-2xl md:text-3xl font-bold">Showcase your Venue</h1>
+                            <p className="text-zinc-400">Great photos are the #1 driver of new customers.</p>
                         </div>
 
-                        {/* Cover */}
-                        {/* Cover Loader */}
-                        {/* Cover & Preview */}
-                        <div className="flex flex-col items-center gap-6">
-                            {/* Cropper Modal (Conditional) */}
-                            {coverCropState && (
-                                <ImageCropper
-                                    imageSrc={coverCropState.src}
-                                    onCancel={() => setCoverCropState(null)}
-                                    onCropComplete={onCoverCropComplete}
-                                    aspect={3 / 2}
-                                />
-                            )}
-
-                            <div className="relative group w-full max-w-sm mx-auto">
-                                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[2rem] opacity-75 group-hover:opacity-100 transition duration-500 blur"></div>
-
-                                {/* Interactive Card Container */}
-                                <div className="relative h-full overflow-hidden rounded-3xl border border-white/10 bg-zinc-900 shadow-2xl">
-
-                                    {/* Image Area (Click to Upload) */}
-                                    <label className="relative block aspect-[3/2] w-full overflow-hidden bg-zinc-800 cursor-pointer group/image">
-                                        {data.coverImageUrl ? (
-                                            <img
-                                                src={data.coverImageUrl}
-                                                alt={data.name}
-                                                className="h-full w-full object-cover transition-transform duration-700 group-hover/image:scale-105"
-                                            />
-                                        ) : (
-                                            <div className="flex h-full w-full items-center justify-center text-white/20 bg-gradient-to-br from-indigo-900/40 to-purple-900/40">
-                                                <div className="flex flex-col items-center gap-2">
-                                                    <ImageIcon className="w-12 h-12 text-white/20" />
-                                                    <span className="text-white/30 font-bold uppercase tracking-widest text-sm">Upload Cover</span>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Hover Overlay */}
-                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-[2px]">
-                                            <div className="flex flex-col items-center gap-2 transform translate-y-4 group-hover/image:translate-y-0 transition-transform">
-                                                <div className="p-3 bg-white rounded-full text-black shadow-lg">
-                                                    <Upload className="w-6 h-6" />
-                                                </div>
-                                                <span className="text-white font-bold text-xs uppercase tracking-wider">Change Photo</span>
+                        {/* Cover Image */}
+                        <div className="bg-zinc-900/50 p-4 md:p-6 rounded-2xl border border-white/5">
+                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                <ImageIcon className="w-5 h-5 text-indigo-400" />
+                                Cover Image
+                            </h3>
+                            <div className="flex flex-col md:flex-row gap-6 items-center">
+                                <div className="relative w-full md:w-1/2 aspect-video bg-zinc-800 rounded-xl overflow-hidden border-2 border-dashed border-zinc-700 hover:border-indigo-500 transition-colors group">
+                                    {data.coverImageUrl ? (
+                                        <img src={data.coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500">
+                                            <Upload className="w-8 h-8 mb-2 opacity-50" />
+                                            <span className="text-sm">Click to upload cover</span>
+                                        </div>
+                                    )}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={onSelectCoverFile}
+                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                    />
+                                    {data.coverImageUrl && (
+                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <div className="flex gap-2">
+                                                <button className="bg-white text-black px-3 py-1.5 rounded-full text-sm font-bold">Change</button>
                                             </div>
                                         </div>
-
-                                        {/* Input */}
-                                        <input type="file" className="hidden" accept="image/*" onChange={onSelectCoverFile} />
-
-                                        {/* Floating Badges (Non-interactive) */}
-                                        <div className="absolute top-3 left-3 pointer-events-none">
-                                            <span className="inline-flex items-center rounded-full bg-black/40 px-3 py-1 text-xs font-bold text-white backdrop-blur-md border border-white/10">
-                                                {TAXONOMY.CATEGORIES.find(c => c.value === data.category)?.label || (typeof data.category === 'string' ? data.category : "")}
-                                            </span>
-                                        </div>
-                                        <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-black/40 px-2.5 py-1 text-xs font-medium backdrop-blur-md border border-white/10 text-white pointer-events-none">
-                                            <span>★</span> 5.0
-                                        </div>
-                                    </label>
-
-                                    {/* Card Content (Preview Only) */}
-                                    <div className="p-5 pointer-events-none select-none">
-                                        <div className="flex justify-between items-start gap-2">
-                                            <h3 className="text-lg font-bold text-white line-clamp-1">{data.name || "Venue Name"}</h3>
-                                        </div>
-
-                                        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/50">
-                                            <span>{typeof data.city === 'string' ? data.city : ""}</span>
-                                            <span>•</span>
-                                            <span className="text-white/80 font-medium">{selectedVibes?.[0] || selectedCuisines?.[0] || "Vibe"}</span>
-                                        </div>
-
-                                        <div className="mt-4 flex items-center gap-2 text-sm text-white/50">
-                                            <span className="font-semibold text-white">Réserver</span>
-                                            <span>→</span>
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
-                            </div>
-
-                            <p className="text-zinc-500 text-sm max-w-md text-center">
-                                Click the image above to upload your cover photo. This is exactly how your venue will appear on the explore page.
-                            </p>
-
-                            {/* Preview Side Redundant */}
-                            <div className="hidden">
-                                <h3 className="font-bold text-lg flex items-center gap-2">
-                                    <span className="text-xs bg-indigo-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Live Preview</span>
-                                </h3>
-
-                                <div className="pointer-events-none select-none transform scale-100 origin-top-left">
-                                    {/* Replicated VenueCard Structure */}
-                                    <div className="relative h-full overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl">
-                                        {/* Image Container */}
-                                        <div className="relative aspect-[3/2] w-full overflow-hidden bg-white/5">
-                                            {data.coverImageUrl ? (
-                                                <img
-                                                    src={data.coverImageUrl}
-                                                    alt={data.name}
-                                                    className="h-full w-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="flex h-full w-full items-center justify-center text-white/20 bg-gradient-to-br from-indigo-900/40 to-purple-900/40">
-                                                    <span className="text-4xl text-white/10 font-bold">AGORA</span>
-                                                </div>
-                                            )}
-
-                                            {/* Badge overlay */}
-                                            <div className="absolute top-3 left-3">
-                                                <span className="inline-flex items-center rounded-full bg-black/40 px-3 py-1 text-xs font-bold text-white backdrop-blur-md border border-white/10">
-                                                    {TAXONOMY.CATEGORIES.find(c => c.value === data.category)?.label || (typeof data.category === 'string' ? data.category : "")}
-                                                </span>
-                                            </div>
-                                            <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-black/40 px-2.5 py-1 text-xs font-medium backdrop-blur-md border border-white/10 text-white">
-                                                <span>★</span> 5.0
-                                            </div>
-                                        </div>
-
-                                        {/* Content */}
-                                        <div className="p-5">
-                                            <div className="flex justify-between items-start gap-2">
-                                                <h3 className="text-lg font-bold text-white line-clamp-1">{data.name || "Venue Name"}</h3>
-                                            </div>
-
-                                            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/50">
-                                                <span>{typeof data.city === 'string' ? data.city : ""}</span>
-                                                <span>•</span>
-                                                <span className="text-white/80 font-medium">{selectedVibes?.[0] || selectedCuisines?.[0] || "General"}</span>
-                                            </div>
-
-                                            <div className="mt-4 flex items-center gap-2 text-sm text-white/50">
-                                                <span className="font-semibold text-white">Réserver</span>
-                                                <span>→</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {/* End Replicated Card */}
+                                <div className="flex-1 space-y-2 text-sm text-zinc-400">
+                                    <p className="font-semibold text-white">Guidelines:</p>
+                                    <ul className="list-disc list-inside space-y-1 ml-1">
+                                        <li>High resolution (1920x1080 recommended)</li>
+                                        <li>Bright, well-lit space</li>
+                                        <li>Horizontal orientation</li>
+                                        <li>No text or logos overlaid</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>
 
                         {/* Gallery */}
-                        <div className="bg-zinc-900/50 p-6 rounded-2xl border border-white/5">
-                            <h3 className="font-bold mb-2 flex items-center gap-2">
-                                Gallery <span className="text-red-500">*</span>
-                                <span className={`text-sm font-normal ${gallery.length >= 5 ? 'text-green-400' : 'text-amber-400'}`}>
-                                    ({gallery.length}/5 minimum)
-                                    {gallery.length >= 5 ? ' ✓' : ''}
-                                </span>
+                        <div className="bg-zinc-900/50 p-4 md:p-6 rounded-2xl border border-white/5">
+                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                <ImageIcon className="w-5 h-5 text-pink-400" />
+                                Gallery ({gallery.length})
                             </h3>
-                            <p className="text-zinc-500 text-xs mb-4">Upload at least 5 high-quality photos of your venue</p>
                             <MediaUpload
                                 initialMedia={gallery}
-                                onChange={(g: any) => { setGallery(g); setIsDirty(true); }}
-                                maxFiles={15}
-                                allowedFormats={['image', 'video']}
-                                title="Gallery"
-                                description="High quality photos and videos"
+                                onChange={setGallery}
+                                maxFiles={20}
                             />
+                            <p className="text-xs text-zinc-500 mt-2 text-center">Add at least 5 photos/videos of the interior, food, and atmosphere.</p>
                         </div>
 
-                        {/* Menu Upload */}
-                        <div className="bg-zinc-900/50 p-6 rounded-2xl border border-white/5">
-                            <h3 className="font-bold mb-4 flex items-center gap-2">
-                                <FileText className="w-5 h-5 text-indigo-400" />
-                                Digital Menu
+                        {/* Menu */}
+                        <div className="bg-zinc-900/50 p-4 md:p-6 rounded-2xl border border-white/5">
+                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                <FileText className="w-5 h-5 text-yellow-400" />
+                                Menu (Optional)
                             </h3>
                             <MediaUpload
                                 initialMedia={menuGallery}
-                                onChange={(g: any) => { setMenuGallery(g); setIsDirty(true); }}
-                                maxFiles={10}
+                                onChange={setMenuGallery}
+                                maxFiles={5}
                                 allowedFormats={['image', 'pdf']}
-                                title="Upload Menu"
-                                description="Images (Multiple pages) or PDF (Max 3)"
                             />
                         </div>
                     </div>
@@ -1188,397 +1250,371 @@ export default function VenueWizardPage() {
                 {currentStep === 3 && (
                     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
                         <div className="text-center space-y-2">
-                            <h1 className="text-3xl font-bold">Set the Atmosphere</h1>
-                            <p className="text-zinc-400">Help guests find exactly what they are looking for.</p>
-
-                            {/* Category-specific requirements banner */}
-                            {(data.category === 'CAFE' || data.category === 'RESTAURANT' || data.category === 'NIGHTLIFE_BARS' || data.category === 'CLUBS_PARTY') && (
-                                <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl inline-block">
-                                    <p className="text-amber-400 text-sm font-medium">
-                                        <span className="text-red-500">*</span> Required for {TAXONOMY.CATEGORIES.find(c => c.value === data.category)?.label || data.category}:
-                                        {data.category === 'CAFE' && ' Cuisine + Vibe'}
-                                        {data.category === 'RESTAURANT' && ' Cuisine'}
-                                        {(data.category === 'NIGHTLIFE_BARS' || data.category === 'CLUBS_PARTY') && ' Vibe + Music Type'}
-                                    </p>
-                                </div>
-                            )}
+                            <h1 className="text-2xl md:text-3xl font-bold">Define the Experience</h1>
+                            <p className="text-zinc-400">Help people find you based on what they're looking for.</p>
                         </div>
 
-                        <div className="space-y-6">
-                            {/* Vibes */}
-                            <div className="bg-zinc-900/50 p-6 rounded-2xl border border-white/5">
-                                <h3 className="font-bold mb-4 flex items-center gap-2">
-                                    <Sparkles className="w-5 h-5 text-fuchsia-500" /> What's the Vibe?
-                                    {(data.category === 'CAFE' || data.category === 'NIGHTLIFE_BARS' || data.category === 'CLUBS_PARTY') && (
-                                        <span className="text-red-500">*</span>
-                                    )}
-                                    {selectedVibes.length > 0 && (
-                                        <span className="text-xs text-green-400 font-normal">({selectedVibes.length} selected ✓)</span>
-                                    )}
+                        {/* Cuisines */}
+                        <div className="bg-zinc-900/50 p-4 md:p-6 rounded-2xl border border-white/5">
+                            <button onClick={() => setCuisinesExpanded(!cuisinesExpanded)} className="w-full flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <Utensils className="w-5 h-5 text-orange-400" />
+                                    Cuisine {data.category === 'RESTAURANT' && <span className="text-red-500">*</span>}
                                 </h3>
-                                <div className="flex flex-col gap-6">
-                                    {(vibesExpanded ? Object.entries(TAXONOMY.VIBE_GROUPS) : Object.entries(TAXONOMY.VIBE_GROUPS).slice(0, 1)).map(([groupName, items]) => (
-                                        <div key={groupName}>
-                                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">{groupName}</h4>
-                                            <div className="flex flex-wrap gap-2">
-                                                {items.map(a => (
-                                                    <button key={a} onClick={() => toggleSelection(selectedVibes, setSelectedVibes, a)}
-                                                        className={`px-4 py-2 rounded-full text-sm border transition-all ${selectedVibes.includes(a) ? 'bg-fuchsia-500 border-fuchsia-500 text-white shadow-[0_0_15px_rgba(232,121,249,0.3)]' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}
-                                                    >
-                                                        {a}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    {!vibesExpanded && (
-                                        <button
-                                            onClick={() => setVibesExpanded(true)}
-                                            className="w-full py-3 rounded-xl border border-dashed border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 hover:bg-white/5 transition-all text-sm font-semibold flex items-center justify-center gap-2 group"
-                                        >
-                                            <Sparkles className="w-4 h-4 text-fuchsia-500 group-hover:scale-110 transition-transform" />
-                                            Show All Vibes
-                                            <ChevronLeft className="w-4 h-4 -rotate-90 group-hover:translate-y-1 transition-transform" />
-                                        </button>
-                                    )}
-                                    {vibesExpanded && (
-                                        <button
-                                            onClick={() => setVibesExpanded(false)}
-                                            className="text-sm text-zinc-500 hover:text-white hover:underline self-center flex items-center gap-1 py-2"
-                                        >
-                                            Show Less <ChevronLeft className="w-3 h-3 rotate-90" />
-                                        </button>
-                                    )}
-                                </div>
+                                <span className="text-xs text-zinc-500">{selectedCuisines.length} selected</span>
+                            </button>
+                            <div className="flex flex-wrap gap-2">
+                                {CUISINES.slice(0, cuisinesExpanded ? undefined : 12).map(c => (
+                                    <button
+                                        key={c}
+                                        onClick={() => toggleSelection(selectedCuisines, setSelectedCuisines, c)}
+                                        className={`px-4 py-2 rounded-full text-sm transition-all border ${selectedCuisines.includes(c)
+                                            ? "bg-orange-500/20 text-orange-200 border-orange-500/50"
+                                            : "bg-black/40 text-zinc-400 border-zinc-800 hover:border-orange-500/30"
+                                            }`}
+                                    >
+                                        {c}
+                                    </button>
+                                ))}
+                                {!cuisinesExpanded && CUISINES.length > 12 && (
+                                    <button onClick={() => setCuisinesExpanded(true)} className="px-4 py-2 rounded-full text-sm bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700">
+                                        +{CUISINES.length - 12} more
+                                    </button>
+                                )}
                             </div>
+                        </div>
 
-                            {/* Music */}
-                            <div className="bg-zinc-900/50 p-6 rounded-2xl border border-white/5">
-                                <h3 className="font-bold mb-4 flex items-center gap-2">
-                                    <Music className="w-5 h-5 text-cyan-500" /> Music & Sounds
-                                    {(data.category === 'NIGHTLIFE_BARS' || data.category === 'CLUBS_PARTY') && (
-                                        <span className="text-red-500">*</span>
-                                    )}
-                                    {selectedMusic.length > 0 && (
-                                        <span className="text-xs text-green-400 font-normal">({selectedMusic.length} selected ✓)</span>
-                                    )}
+                        {/* Vibes */}
+                        <div className="bg-zinc-900/50 p-4 md:p-6 rounded-2xl border border-white/5">
+                            <div className="mb-4">
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <Sparkles className="w-5 h-5 text-purple-400" />
+                                    Vibe & Atmosphere {(data.category === 'CAFE' || data.category === 'NIGHTLIFE_BARS' || data.category === 'CLUBS_PARTY') && <span className="text-red-500">*</span>}
                                 </h3>
-                                <div className="flex flex-col gap-6">
-                                    {(musicExpanded ? Object.entries(TAXONOMY.MUSIC_GROUPS) : Object.entries(TAXONOMY.MUSIC_GROUPS).slice(1, 2)).map(([groupName, items]) => (
-                                        // Default showing 'Electronic & Dance' or 'Live & Acoustic' based on typical preference, 
-                                        // or maybe just the first one. Let's show the first two groups or just the first widely popular one?
-                                        // Actually, let's show "Live & Acoustic" and "Electronic & Dance" (indices 0 and 1) or just index 0.
-                                        // Let's show index 1 (Electronic) as default since it's very popular for venues, or let's show all if needed.
-                                        // Let's stick to slice(0, 1) which is "Live & Acoustic" based on my taxonomy order.
-                                        <div key={groupName}>
-                                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">{groupName}</h4>
-                                            <div className="flex flex-wrap gap-2">
-                                                {items.map(m => (
-                                                    <button key={m} onClick={() => toggleSelection(selectedMusic, setSelectedMusic, m)}
-                                                        className={`px-4 py-2 rounded-full text-sm border transition-all ${selectedMusic.includes(m) ? 'bg-cyan-500 border-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}
-                                                    >
-                                                        {m}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    {!musicExpanded && (
-                                        <button
-                                            onClick={() => setMusicExpanded(true)}
-                                            className="w-full py-3 rounded-xl border border-dashed border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 hover:bg-white/5 transition-all text-sm font-semibold flex items-center justify-center gap-2 group"
-                                        >
-                                            <Music className="w-4 h-4 text-cyan-500 group-hover:scale-110 transition-transform" />
-                                            Show All Music Styles
-                                            <ChevronLeft className="w-4 h-4 -rotate-90 group-hover:translate-y-1 transition-transform" />
-                                        </button>
-                                    )}
-                                    {musicExpanded && (
-                                        <button
-                                            onClick={() => setMusicExpanded(false)}
-                                            className="text-sm text-zinc-500 hover:text-white hover:underline self-center flex items-center gap-1 py-2"
-                                        >
-                                            Show Less <ChevronLeft className="w-3 h-3 rotate-90" />
-                                        </button>
-                                    )}
-                                </div>
                             </div>
+                            <div className="flex flex-wrap gap-2">
+                                {AMBIANCES.map(v => (
+                                    <button
+                                        key={v}
+                                        onClick={() => toggleSelection(selectedVibes, setSelectedVibes, v)}
+                                        className={`px-4 py-2 rounded-full text-sm transition-all border ${selectedVibes.includes(v)
+                                            ? "bg-purple-500/20 text-purple-200 border-purple-500/50"
+                                            : "bg-black/40 text-zinc-400 border-zinc-800 hover:border-purple-500/30"
+                                            }`}
+                                    >
+                                        {v}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
-                            {/* Cuisines */}
-                            <div className="bg-zinc-900/50 p-6 rounded-2xl border border-white/5">
-                                <h3 className="font-bold mb-4 flex items-center gap-2">
-                                    <Utensils className="w-5 h-5 text-orange-500" /> Cuisine & Food
-                                    {(data.category === 'CAFE' || data.category === 'RESTAURANT') && (
-                                        <span className="text-red-500">*</span>
-                                    )}
-                                    {selectedCuisines.length > 0 && (
-                                        <span className="text-xs text-green-400 font-normal">({selectedCuisines.length} selected ✓)</span>
-                                    )}
+                        {/* Music */}
+                        <div className="bg-zinc-900/50 p-4 md:p-6 rounded-2xl border border-white/5">
+                            <div className="mb-4">
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <Music className="w-5 h-5 text-pink-400" />
+                                    Music {(data.category === 'NIGHTLIFE_BARS' || data.category === 'CLUBS_PARTY') && <span className="text-red-500">*</span>}
                                 </h3>
-                                <div className="flex flex-col gap-6">
-                                    {(cuisinesExpanded ? Object.entries(TAXONOMY.CUISINE_GROUPS) : Object.entries(TAXONOMY.CUISINE_GROUPS).slice(0, 1)).map(([groupName, items]) => (
-                                        <div key={groupName}>
-                                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">{groupName}</h4>
-                                            <div className="flex flex-wrap gap-2">
-                                                {items.map(c => (
-                                                    <button key={c} onClick={() => toggleSelection(selectedCuisines, setSelectedCuisines, c)}
-                                                        className={`px-4 py-2 rounded-full text-sm border transition-all ${selectedCuisines.includes(c) ? 'bg-orange-500 border-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}
-                                                    >
-                                                        {c}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    {!cuisinesExpanded && (
-                                        <button
-                                            onClick={() => setCuisinesExpanded(true)}
-                                            className="w-full py-3 rounded-xl border border-dashed border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 hover:bg-white/5 transition-all text-sm font-semibold flex items-center justify-center gap-2 group"
-                                        >
-                                            <Sparkles className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform" />
-                                            Show All Food Categories
-                                            <ChevronLeft className="w-4 h-4 -rotate-90 group-hover:translate-y-1 transition-transform" />
-                                        </button>
-                                    )}
-                                    {cuisinesExpanded && (
-                                        <button
-                                            onClick={() => setCuisinesExpanded(false)}
-                                            className="text-sm text-zinc-500 hover:text-white hover:underline self-center flex items-center gap-1 py-2"
-                                        >
-                                            Show Less <ChevronLeft className="w-3 h-3 rotate-90" />
-                                        </button>
-                                    )}
-                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {MUSIC_STYLES.map(m => (
+                                    <button
+                                        key={m}
+                                        onClick={() => toggleSelection(selectedMusic, setSelectedMusic, m)}
+                                        className={`px-4 py-2 rounded-full text-sm transition-all border ${selectedMusic.includes(m)
+                                            ? "bg-pink-500/20 text-pink-200 border-pink-500/50"
+                                            : "bg-black/40 text-zinc-400 border-zinc-800 hover:border-pink-500/30"
+                                            }`}
+                                    >
+                                        {m}
+                                    </button>
+                                ))}
                             </div>
                         </div>
-                    </div>
-                )}
 
-                {/* STEP 4: OPERATIONS */}
-                {currentStep === 4 && (
-                    <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-                        <div className="text-center space-y-2">
-                            <h1 className="text-3xl font-bold">Important Details</h1>
-                            <p className="text-zinc-400">Socials, policies, and facilities.</p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                            {/* Policies */}
-                            {/* Left Column: Reservation Policy */}
-                            <div className="bg-zinc-900/50 p-6 rounded-2xl border border-white/5 space-y-4 h-fit">
-                                <h3 className="font-bold text-lg mb-2">Booking & Reservations</h3>
-                                <div className="space-y-3">
-                                    <div className="grid grid-cols-1 gap-3">
-                                        {[
-                                            { value: "AGORA", label: "Agora Reservations", desc: "Guests receive a QR code. Verify & check-in directly from your dashboard.", icon: AgoraIcon },
-                                            { value: "WALK_IN_ONLY", label: "No Reservations", desc: "First come, first served.", icon: ShieldCheck },
-                                            { value: "PHONE_WHATSAPP", label: "Phone / WhatsApp", desc: "Accept bookings via Phone or WhatsApp.", icon: Phone },
-                                            { value: "EXTERNAL_LINK", label: "External Website", desc: "Link to your own booking system.", icon: LinkIcon },
-                                        ].map((opt) => (
-                                            <div key={opt.value}>
-                                                <div
-                                                    onClick={() => {
-                                                        updateField("reservationPolicy", opt.value);
-                                                        if (opt.value === 'WALK_IN_ONLY') updateField("reservationsEnabled", false);
-                                                        else updateField("reservationsEnabled", true);
-                                                    }}
-                                                    className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${data.reservationPolicy === opt.value ? 'bg-indigo-600/10 border-indigo-500 ring-1 ring-indigo-500' : 'bg-zinc-800 border-zinc-700 hover:border-zinc-600'}`}
-                                                >
-                                                    <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center ${data.reservationPolicy === opt.value ? 'bg-indigo-600 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
-                                                        <opt.icon className="w-5 h-5" />
-                                                    </div>
-                                                    <div>
-                                                        <div className={`font-bold text-sm ${data.reservationPolicy === opt.value ? 'text-white' : 'text-zinc-300'}`}>{opt.label}</div>
-                                                        <div className="text-xs text-zinc-500">{opt.desc}</div>
-                                                    </div>
-                                                    {data.reservationPolicy === opt.value && <div className="ml-auto w-4 h-4 rounded-full bg-indigo-500 border-2 border-black"></div>}
-                                                </div>
-
-                                                {/* Nested Input: Phone/WhatsApp */}
-                                                {opt.value === 'PHONE_WHATSAPP' && data.reservationPolicy === 'PHONE_WHATSAPP' && (
-                                                    <div className="mt-2 ml-14 animate-in fade-in slide-in-from-top-2 bg-zinc-800/50 p-4 rounded-xl border border-dashed border-indigo-500/30">
-                                                        <label className="text-xs font-bold text-indigo-400 mb-1 block">WhatsApp / Phone Number <span className="text-red-500">*</span></label>
-                                                        <input
-                                                            type="text"
-                                                            value={data.reservationPhoneNumber}
-                                                            onChange={e => updateField("reservationPhoneNumber", e.target.value)}
-                                                            placeholder="+212 6..."
-                                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm outline-none focus:border-indigo-500 placeholder:text-zinc-600"
-                                                        />
-                                                    </div>
-                                                )}
-
-                                                {/* Nested Input: External URL */}
-                                                {opt.value === 'EXTERNAL_LINK' && data.reservationPolicy === 'EXTERNAL_LINK' && (
-                                                    <div className="mt-2 ml-14 animate-in fade-in slide-in-from-top-2 bg-zinc-800/50 p-4 rounded-xl border border-dashed border-indigo-500/30">
-                                                        <label className="text-xs font-bold text-indigo-400 mb-1 block">Booking URL <span className="text-red-500">*</span></label>
-                                                        <input
-                                                            type="url"
-                                                            value={data.reservationUrl}
-                                                            onChange={e => updateField("reservationUrl", e.target.value)}
-                                                            placeholder="https://..."
-                                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm outline-none focus:border-indigo-500 placeholder:text-zinc-600"
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                        {/* Facilities */}
+                        <div className="bg-zinc-900/50 p-4 md:p-6 rounded-2xl border border-white/5">
+                            <div className="mb-4">
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <Armchair className="w-5 h-5 text-emerald-400" />
+                                    Facilities & Amenities
+                                </h3>
                             </div>
-
-                            {/* Right Column: House Rules (Dress Code, Age, Payments) */}
-                            <div className="bg-zinc-900/50 p-6 rounded-2xl border border-white/5 space-y-6 h-fit">
-                                <h3 className="font-bold text-lg mb-2">House Rules</h3>
-
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-zinc-400 block">Dress Code <span className="text-red-500">*</span></label>
-                                        <select
-                                            value={data.dressCode}
-                                            onChange={e => updateField("dressCode", e.target.value)}
-                                            className="w-full bg-zinc-800 rounded-xl p-3 text-sm outline-none border border-zinc-700 focus:border-indigo-500 transition-colors"
-                                        >
-                                            <option value="">Select Dress Code...</option>
-                                            {DRESS_CODES.map(d => <option key={d} value={d}>{d}</option>)}
-                                        </select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-zinc-400 block">Age Policy <span className="text-red-500">*</span></label>
-                                        <select
-                                            value={data.agePolicy}
-                                            onChange={e => updateField("agePolicy", e.target.value)}
-                                            className="w-full bg-zinc-800 rounded-xl p-3 text-sm outline-none border border-zinc-700 focus:border-indigo-500 transition-colors"
-                                        >
-                                            <option value="">Select Age Policy...</option>
-                                            {AGE_POLICIES.map(a => <option key={a} value={a}>{a}</option>)}
-                                        </select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-zinc-400 block">Payment Methods <span className="text-red-500">*</span></label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {PAYMENT_METHODS.map(p => (
-                                                <button
-                                                    key={p}
-                                                    onClick={() => toggleSelection(selectedPayments, setSelectedPayments, p)}
-                                                    className={`text-xs px-3 py-2 rounded-lg border transition-all ${selectedPayments.includes(p) ? 'bg-green-600/20 border-green-500 text-green-500 font-medium' : 'border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:bg-zinc-800'}`}
-                                                >
-                                                    {p}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-
-                        {/* Facilities Checklist */}
-                        <div className="bg-zinc-900/50 p-6 rounded-2xl border border-white/5">
-                            <h3 className="font-bold text-lg mb-4">Facilities</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <div className="flex flex-wrap gap-2">
                                 {FACILITIES.map(f => (
-                                    <label key={f.code} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${selectedFacilities.includes(f.code) ? 'bg-indigo-600/10 border-indigo-500/50' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'}`}>
-                                        <div className={`w-5 h-5 rounded flex items-center justify-center border ${selectedFacilities.includes(f.code) ? 'bg-indigo-500 border-indigo-500' : 'border-zinc-600'}`}>
-                                            {selectedFacilities.includes(f.code) && <Check className="w-3 h-3 text-white" />}
-                                        </div>
-                                        <input type="checkbox" className="hidden" checked={selectedFacilities.includes(f.code)} onChange={() => toggleSelection(selectedFacilities, setSelectedFacilities, f.code)} />
-                                        <span className={`text-sm ${selectedFacilities.includes(f.code) ? 'text-white font-medium' : 'text-zinc-400'}`}>{f.label}</span>
-                                    </label>
+                                    <button
+                                        key={f.code}
+                                        onClick={() => toggleSelection(selectedFacilities, setSelectedFacilities, f.code)}
+                                        className={`px-4 py-2 rounded-full text-sm transition-all border ${selectedFacilities.includes(f.code)
+                                            ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/50"
+                                            : "bg-black/40 text-zinc-400 border-zinc-800 hover:border-emerald-500/30"
+                                            }`}
+                                    >
+                                        {f.label}
+                                    </button>
                                 ))}
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* STEP 5: FLOOR PLAN */}
-                {currentStep === 5 && (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 h-full flex flex-col">
-                        <div className="text-center space-y-4 max-w-2xl mx-auto mb-8">
-                            <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">Choose Your Reservation Experience</h1>
-                            <p className="text-lg text-zinc-300">
-                                Do you want to offer a quick, simple booking flow, or invite guests to a <span className="text-indigo-400 font-bold">Virtual Experience</span> where they can explore the venue and hand-pick their perfect table?
-                            </p>
+                {/* STEP 4: POLICIES */}
+                {currentStep === 4 && (
+                    <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
+                        <div className="text-center space-y-2">
+                            <h1 className="text-2xl md:text-3xl font-bold">Policies & Booking</h1>
+                            <p className="text-zinc-400">Set the rules and how people book with you.</p>
                         </div>
 
-                        {!data.reservationsEnabled ? (
-                            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-zinc-800 rounded-2xl p-12 text-zinc-500 bg-zinc-900/10">
-                                <ShieldCheck className="w-16 h-16 mb-4 text-zinc-600" />
-                                <h3 className="text-xl font-bold text-white mb-2">Reservations Disabled</h3>
-                                <p className="mb-6">You've turned off reservations for this venue, so a floor plan isn't needed.</p>
-                                <button
-                                    onClick={() => updateField("reservationsEnabled", true)}
-                                    className="px-6 py-2 bg-white text-black rounded-full font-bold text-sm hover:scale-105 transition-transform"
-                                >
-                                    Enable Reservations
-                                </button>
+                        <div className="bg-zinc-900/50 p-4 md:p-8 rounded-2xl border border-white/5 space-y-6">
+                            {/* Policies */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Dress Code <span className="text-red-500">*</span></label>
+                                    <select
+                                        value={data.dressCode} onChange={e => updateField("dressCode", e.target.value)}
+                                        className="w-full bg-zinc-800 rounded-lg p-3 outline-none"
+                                    >
+                                        <option value="">Select Dress Code...</option>
+                                        {DRESS_CODES.map(d => <option key={d} value={d}>{d}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Age Policy <span className="text-red-500">*</span></label>
+                                    <select
+                                        value={data.agePolicy} onChange={e => updateField("agePolicy", e.target.value)}
+                                        className="w-full bg-zinc-800 rounded-lg p-3 outline-none"
+                                    >
+                                        <option value="">Select Age Policy...</option>
+                                        {AGE_POLICIES.map(a => <option key={a} value={a}>{a}</option>)}
+                                    </select>
+                                </div>
                             </div>
-                        ) : (
-                            <>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto mb-8">
-                                    <button
-                                        onClick={() => { setEnableFloorPlan(false); setIsDirty(true); }}
-                                        className={`group relative p-6 rounded-2xl border-2 text-left transition-all hover:scale-[1.02] ${!enableFloorPlan
-                                            ? 'bg-zinc-900 border-white text-white shadow-[0_0_30px_rgba(255,255,255,0.1)]'
-                                            : 'bg-zinc-900/50 border-zinc-700 text-zinc-500 hover:border-zinc-500 hover:bg-zinc-900'}`}
-                                    >
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className={`p-3 rounded-full ${!enableFloorPlan ? 'bg-white text-black' : 'bg-zinc-800 text-zinc-400 group-hover:bg-zinc-700'}`}>
-                                                <Zap className="w-6 h-6" />
-                                            </div>
-                                            {!enableFloorPlan && <div className="px-3 py-1 bg-white/10 rounded-full text-[10px] font-bold uppercase tracking-wider">Selected</div>}
-                                        </div>
-                                        <h3 className={`text-xl font-bold mb-2 ${!enableFloorPlan ? 'text-white' : 'text-zinc-300'}`}>Simple Booking</h3>
-                                        <p className="text-sm leading-relaxed opacity-80">
-                                            The classic approach. Guests select a date, time, and party size. Fast, familiar, and efficient.
-                                        </p>
-                                    </button>
 
-                                    <button
-                                        onClick={() => { setEnableFloorPlan(true); setIsDirty(true); }}
-                                        className={`group relative p-6 rounded-2xl border-2 text-left transition-all hover:scale-[1.02] ${enableFloorPlan
-                                            ? 'bg-indigo-900/20 border-indigo-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.2)]'
-                                            : 'bg-zinc-900/50 border-zinc-700 text-zinc-500 hover:border-indigo-500/50 hover:bg-indigo-900/10'}`}
-                                    >
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className={`p-3 rounded-full ${enableFloorPlan ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400 group-hover:bg-indigo-600/50 group-hover:text-white'}`}>
-                                                <Sparkles className="w-6 h-6" />
-                                            </div>
-                                            {enableFloorPlan && <div className="px-3 py-1 bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 rounded-full text-[10px] font-bold uppercase tracking-wider">Recommended</div>}
-                                        </div>
-                                        <h3 className={`text-xl font-bold mb-2 ${enableFloorPlan ? 'text-white' : 'text-zinc-300'}`}>Immersive Virtual Tour</h3>
-                                        <p className="text-sm leading-relaxed opacity-80">
-                                            Wow your guests. Let them virtually navigate your venue and choose the exact table they want.
-                                        </p>
-                                    </button>
+                            <div className="flex flex-col md:flex-row gap-4">
+                                <label className="flex items-center gap-3 bg-zinc-800 p-4 rounded-xl flex-1 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={data.parkingAvailable}
+                                        onChange={e => updateField("parkingAvailable", e.target.checked)}
+                                        className="w-5 h-5 rounded border-zinc-600 bg-zinc-700 text-indigo-600"
+                                    />
+                                    <span className="font-medium">Parking Available</span>
+                                </label>
+                                <label className="flex items-center gap-3 bg-zinc-800 p-4 rounded-xl flex-1 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={data.valetParking}
+                                        onChange={e => updateField("valetParking", e.target.checked)}
+                                        className="w-5 h-5 rounded border-zinc-600 bg-zinc-700 text-indigo-600"
+                                    />
+                                    <span className="font-medium">Valet Service</span>
+                                </label>
+                            </div>
+
+                            <hr className="border-white/5" />
+
+                            {/* Payment Types */}
+                            <div>
+                                <label className="block text-xs uppercase font-bold text-zinc-500 mb-4">Payment Methods <span className="text-red-500">*</span></label>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {PAYMENT_METHODS.map(method => (
+                                        <label key={method} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${selectedPayments.includes(method) ? 'bg-indigo-900/30 border-indigo-500/50 text-white' : 'bg-black/20 border-zinc-800 text-zinc-400'}`}>
+                                            <input
+                                                type="checkbox"
+                                                className="hidden"
+                                                checked={selectedPayments.includes(method)}
+                                                onChange={() => toggleSelection(selectedPayments, setSelectedPayments, method)}
+                                            />
+                                            <span className="text-sm">{method}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <hr className="border-white/5" />
+
+                            {/* Booking Configuration */}
+                            <div>
+                                <label className="block text-xs uppercase font-bold text-zinc-500 mb-4">Reservations</label>
+                                <div className="bg-zinc-800 rounded-xl overflow-hidden p-1 flex mb-6">
+                                    {[
+                                        { id: 'AGORA', label: 'Use Agora System', icon: Sparkles },
+                                        { id: 'PHONE_WHATSAPP', label: 'Phone / WhatsApp', icon: Phone },
+                                        { id: 'EXTERNAL_LINK', label: 'External Website', icon: LinkIcon },
+                                    ].map(type => (
+                                        <button
+                                            key={type.id}
+                                            onClick={() => updateField("reservationPolicy", type.id)}
+                                            className={`flex-1 flex gap-2 items-center justify-center py-3 rounded-lg text-sm font-bold transition-all ${data.reservationPolicy === type.id
+                                                ? 'bg-indigo-600 text-white shadow-lg'
+                                                : 'hover:bg-zinc-700 text-zinc-400'
+                                                }`}
+                                        >
+                                            <type.icon className="w-4 h-4" />
+                                            {type.label}
+                                        </button>
+                                    ))}
                                 </div>
 
-                                {enableFloorPlan ? (
-                                    <div className="flex-1 min-h-[600px] border border-zinc-800 rounded-2xl overflow-hidden">
-                                        <FloorPlanEditor
-                                            initialScenes={floorPlanScenes}
-                                            onSave={(scenes) => { setFloorPlanScenes(scenes); setIsDirty(true); }}
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-zinc-800 rounded-2xl p-12 text-zinc-500">
-                                        <CheckCircle2 className="w-16 h-16 mb-4 text-green-500" />
-                                        <h3 className="text-xl font-bold text-white mb-2">You're all set!</h3>
-                                        <p>Guests will book without selecting a specific table.</p>
-                                        <p className="text-xs text-zinc-500 mt-4">Click "Next Step" to review.</p>
+                                {/* Conditional Config */}
+                                {data.reservationPolicy === 'AGORA' && (
+                                    <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 flex items-start gap-4">
+                                        <div className="p-2 bg-indigo-500/20 rounded-full">
+                                            <Sparkles className="w-5 h-5 text-indigo-400" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-white font-bold text-sm mb-1">Smart Reservations</h4>
+                                            <p className="text-zinc-400 text-xs">Agora will handle your bookings. You'll get notified in the dashboard and can manage tables, customer logs, and deposits automatically.</p>
+                                        </div>
                                     </div>
                                 )}
-                            </>
-                        )}
+
+                                {data.reservationPolicy === 'PHONE_WHATSAPP' && (
+                                    <div className="animate-in fade-in slide-in-from-top-2">
+                                        <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Booking Phone Number</label>
+                                        <div className="flex items-center gap-2 bg-zinc-900 rounded-lg px-3 py-2 border border-zinc-700 focus-within:border-indigo-500">
+                                            <Phone className="w-5 h-5 text-green-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="06..."
+                                                value={data.reservationPhoneNumber}
+                                                onChange={e => updateField("reservationPhoneNumber", e.target.value)}
+                                                className="w-full bg-transparent border-none text-sm outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {data.reservationPolicy === 'EXTERNAL_LINK' && (
+                                    <div className="animate-in fade-in slide-in-from-top-2">
+                                        <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Booking URL</label>
+                                        <div className="flex items-center gap-2 bg-zinc-900 rounded-lg px-3 py-2 border border-zinc-700 focus-within:border-indigo-500">
+                                            <LinkIcon className="w-5 h-5 text-blue-400" />
+                                            <input
+                                                type="url"
+                                                placeholder="https://sevenrooms.com/..."
+                                                value={data.reservationUrl}
+                                                onChange={e => updateField("reservationUrl", e.target.value)}
+                                                className="w-full bg-transparent border-none text-sm outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+
+                        </div>
                     </div>
                 )}
+
+                {/* STEP 5: FLOOR PLAN */}
+                {currentStep === 5 && (
+                    <div className="space-y-4 animate-in fade-in h-full flex flex-col">
+                        <div className="text-center space-y-1 mb-4">
+                            <h1 className="text-2xl font-bold">Interactive Floor Plan</h1>
+                            <p className="text-zinc-400 text-sm">Design your venue layout for immersive reservations.</p>
+                        </div>
+
+                        <div className="flex-1 bg-zinc-900 rounded-2xl border border-white/5 overflow-hidden flex flex-col relative h-[600px] md:h-[700px]">
+                            {!enableFloorPlan ? (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-10">
+                                    <div className="max-w-md text-center space-y-4 p-8 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl">
+                                        <div className="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Map className="w-8 h-8" />
+                                        </div>
+                                        <h3 className="text-xl font-bold text-white">Enable Floor Plan?</h3>
+                                        <p className="text-zinc-400 text-sm">Allow guests to choose their specific table. This boosts conversion by 30%.</p>
+                                        <button
+                                            onClick={() => { setEnableFloorPlan(true); setIsDirty(true); }}
+                                            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition-colors"
+                                        >
+                                            Enable Designer
+                                        </button>
+                                        <button
+                                            onClick={() => handleSaveStep(6)} // Skip to finish
+                                            className="text-zinc-500 hover:text-white text-sm"
+                                        >
+                                            Skip, use simple list view
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {/* The Editor */}
+                            <FloorPlanEditor
+                                initialScenes={floorPlanScenes}
+                                onSave={(scenes: any) => {
+                                    setFloorPlanScenes(scenes);
+                                    setIsDirty(true);
+                                }}
+                            />
+                        </div>
+                        {/* Helper for floor plan if needed */}
+                        <div className="flex justify-center">
+                            <button
+                                onClick={() => { setEnableFloorPlan(false); setIsDirty(true); }}
+                                className="text-xs text-red-500 hover:text-red-400"
+                            >
+                                Disable Floor Plan (Reset)
+                            </button>
+                        </div>
+                    </div>
+                )}
+
             </div>
+
+            {/* Cropper Modal */}
+            {coverCropState && (
+                <ImageCropper
+                    imageSrc={coverCropState.src}
+                    aspect={16 / 9}
+                    onCropComplete={onCoverCropComplete}
+                    onCancel={() => setCoverCropState(null)}
+                />
+            )}
+
+            {/* Bottom Navigation Bar - Global (Visible on all screens) */}
+            <div className="fixed bottom-0 left-0 w-full bg-zinc-900/90 backdrop-blur-xl border-t border-zinc-800 p-4 z-50 flex items-center justify-between safe-area-pb">
+                <button
+                    onClick={() => currentStep > 1 ? setCurrentStep(currentStep - 1) : router.back()}
+                    className="px-6 py-3 rounded-xl bg-zinc-800 text-white font-bold text-sm active:scale-95 transition-transform hover:bg-zinc-700 scale-95 origin-left"
+                >
+                    {currentStep === 1 ? 'Exit' : 'Back'}
+                </button>
+
+                {/* Stepper Moved Here */}
+                <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((step) => (
+                        <button
+                            key={step}
+                            onClick={() => {
+                                if (venueId) handleSaveStep(step);
+                            }}
+                            disabled={!venueId}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all
+                                ${currentStep === step
+                                    ? 'bg-white text-black scale-110 shadow-lg'
+                                    : step <= completedStep
+                                        ? 'bg-emerald-500 text-white hover:bg-emerald-600' // Green for submitted/completed steps
+                                        : 'bg-zinc-900 text-zinc-600 hover:bg-zinc-800'
+                                }
+                            `}
+                        >
+                            {step <= completedStep ? <Check size={14} strokeWidth={3} /> : step}
+                        </button>
+                    ))}
+                </div>
+
+                <button
+                    onClick={() => handleSaveStep(currentStep + 1)}
+                    disabled={saving}
+                    className="px-8 py-3 rounded-xl bg-white text-black font-bold text-sm shadow-lg shadow-white/10 active:scale-90 transition-transform disabled:opacity-50 hover:bg-indigo-50 scale-95 origin-right"
+                >
+                    {saving ? 'Saving...' : (currentStep === TOTAL_STEPS ? 'Finish' : 'Next')}
+                </button>
+            </div>
+
         </div>
     );
 }

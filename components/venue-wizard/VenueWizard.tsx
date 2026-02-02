@@ -21,6 +21,36 @@ export default function VenueWizard({ initialId }: { initialId?: string | null }
     const [isLoaded, setIsLoaded] = useState(false);
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, onConfirm: () => void }>({ isOpen: false, onConfirm: () => { } });
 
+    // Validation Guard
+    const validateProgress = (targetStep: number, data: any): number => {
+        // Rule: You cannot be on Step N if Step N-1 is incomplete.
+        // We check from Step 1 upwards.
+
+        // Step 1 Check (Must pass to go to Step 2)
+        const step1Valid = data.name && data.category && data.coverImageUrl;
+        if (!step1Valid) return 1;
+        if (targetStep === 1) return 1;
+
+        // Step 2 Check (Must pass to go to Step 3)
+        const step2Valid = data.city && data.address;
+        if (!step2Valid) return 2;
+        if (targetStep === 2) return 2;
+
+        // Step 3 Check (Details - No mandatory fields, so always passes)
+        const step3Valid = true;
+        if (targetStep === 3) return 3;
+
+        // Step 4 Check (Media - Must have >= 5 items to go to Step 5)
+        const gallery = data.media?.filter((m: any) => m.type === 'image' || m.type === 'video') || [];
+        const step4Valid = gallery.length >= 5;
+        if (!step4Valid) return 4;
+        if (targetStep === 4) return 4;
+
+        // Step 5 (Experience) - Mandatory? Assume yes if we add check later.
+
+        return targetStep;
+    };
+
     // Load initialization data
     useEffect(() => {
         const loadDraft = async () => {
@@ -36,7 +66,6 @@ export default function VenueWizard({ initialId }: { initialId?: string | null }
                     const data = await res.json();
 
                     console.log("   📦 API Response status:", res.status);
-                    console.log("   📦 API Response data:", data);
 
                     if (data.venue) {
                         const v = data.venue;
@@ -53,16 +82,21 @@ export default function VenueWizard({ initialId }: { initialId?: string | null }
 
                         // Restore wizard step from DB (prioritize DB over localStorage)
                         if (!initialId) {
-                            const dbStep = v.wizardStep;
-                            const savedStep = localStorage.getItem("agora_wizard_step");
+                            const dbStep = v.wizardStep || 1;
+                            const savedStep = parseInt(localStorage.getItem("agora_wizard_step") || "1");
 
-                            if (dbStep && dbStep > 1) {
-                                setStep(dbStep);
-                                console.log("   ✅ Restored step from DB:", dbStep);
-                            } else if (savedStep) {
-                                setStep(parseInt(savedStep));
-                                console.log("   ✅ Restored step from localStorage:", savedStep);
+                            // Determine intended step (max of DB or LocalStorage, but DB is safer source of truth)
+                            let intendedStep = dbStep;
+                            if (savedStep > dbStep) intendedStep = savedStep;
+
+                            // Validate intended step against data
+                            const safeStep = validateProgress(intendedStep, mappedData);
+
+                            if (safeStep !== intendedStep) {
+                                console.log(`   ⚠️ Downgrading step from ${intendedStep} to ${safeStep} due to missing data.`);
                             }
+
+                            setStep(safeStep);
                         }
                     } else if (data.error === "NOT_FOUND" || res.status === 404) {
                         // Stale ID! Clear everything.
@@ -92,14 +126,19 @@ export default function VenueWizard({ initialId }: { initialId?: string | null }
                         const parsedData = JSON.parse(savedData);
                         setDraftData(parsedData);
                         console.log("   ✅ Restored from localStorage:", parsedData);
+
+                        // Validate localStorage step
+                        if (savedStep) {
+                            const intendedStep = parseInt(savedStep);
+                            const safeStep = validateProgress(intendedStep, parsedData);
+                            if (safeStep !== intendedStep) {
+                                console.log(`   ⚠️ Downgrading localStorage step from ${intendedStep} to ${safeStep} due to missing data.`);
+                            }
+                            setStep(safeStep);
+                        }
                     } catch (e) {
                         console.error("   ❌ Failed to parse saved data:", e);
                     }
-                }
-
-                if (savedStep) {
-                    setStep(parseInt(savedStep));
-                    console.log("   ✅ Restored step from localStorage:", savedStep);
                 }
             }
 

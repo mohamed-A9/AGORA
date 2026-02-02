@@ -4,6 +4,7 @@ import { CldUploadWidget } from "next-cloudinary";
 import { Upload, ChevronLeft, ChevronRight, Trash2, FileText, Pencil, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import ImageCropper from "./ImageCropper";
+import VideoEditor, { VideoTransformations } from "./VideoEditor";
 import Toast from "./Toast";
 import {
     validateFile,
@@ -208,14 +209,66 @@ export default function MediaUpload({
         return url;
     };
 
-    const handleCropSave = (cropPixels: any) => {
+    const handleVideoSave = (transforms: VideoTransformations) => {
+        if (croppingItemIndex === null) return;
+        const newItems = [...items];
+        const item = newItems[croppingItemIndex];
+        let cleanUrl = getCleanUrl(item.url);
+
+        // Construct Transformation String
+        // Order matters for some operations, generally: Trim -> Rotate -> Effect -> Resize/Crop
+        // Cloudinary processes chained transformations from left to right usually.
+
+        let transformParts: string[] = [];
+
+        // 1. Trim (Start Offset / End Offset)
+        if (transforms.startTime > 0) transformParts.push(`so_${transforms.startTime}`);
+        if (transforms.endTime !== null) transformParts.push(`eo_${transforms.endTime}`);
+
+        // 2. Rotation
+        if (transforms.rotation !== 0) transformParts.push(`a_${transforms.rotation}`);
+
+        // 3. Audio (Mute)
+        if (transforms.isMuted) transformParts.push(`ac_none`);
+
+        // 4. Zoom (Center Crop)
+        // Logic: To zoom 2x, we crop to 50% width/height from center.
+        if (transforms.zoom > 1) {
+            // Factor = 1 / zoom. E.g. Zoom 2x -> Width 0.5
+            // using relative width flags w_1.0 etc doesn't work well with c_crop always.
+            // Using "w_<1/zoom >" if using float flags might effectively zoom.
+            // Safest simple zoom: c_crop,g_center,w_<1/zoom>,h_<1/zoom> combined with implicit relative sizing (fl_relative_width not assumed everywhere).
+            // Actually, scaling UP `c_scale,w_...` makes it bigger but frame same.
+            // To ZOOM IN while keeping frame: Crop the center.
+            // "w_0.5,h_0.5,c_crop,g_center,fl_relative" is standard for 2x zoom.
+            const decimal = (1 / transforms.zoom).toFixed(2);
+            transformParts.push(`c_crop,g_center,w_${decimal},h_${decimal},fl_relative`);
+        }
+
+        if (transformParts.length > 0) {
+            const transformString = transformParts.join(",");
+            cleanUrl = cleanUrl.replace("/upload/", `/upload/${transformString}/`);
+        }
+
+        newItems[croppingItemIndex] = { ...item, url: cleanUrl };
+        onChange(newItems);
+        setCroppingItemIndex(null);
+    };
+
+    const handleCropSave = (cropPixels: any, rotation: number = 0) => {
         if (croppingItemIndex === null || !cropPixels) return;
 
         const newItems = [...items];
         const item = newItems[croppingItemIndex];
         const cleanUrl = getCleanUrl(item.url);
 
-        const transform = `c_crop,x_${cropPixels.x},y_${cropPixels.y},w_${cropPixels.width},h_${cropPixels.height}`;
+        // Build transformation string: Rotate first, then crop
+        let transform = "";
+        if (rotation !== 0) {
+            transform += `a_${rotation}/`;
+        }
+        transform += `c_crop,x_${cropPixels.x},y_${cropPixels.y},w_${cropPixels.width},h_${cropPixels.height}`;
+
         const newUrl = cleanUrl.replace("/upload/", `/upload/${transform}/`);
 
         newItems[croppingItemIndex] = { ...item, url: newUrl };
@@ -235,11 +288,19 @@ export default function MediaUpload({
                 />
             )}
 
-            {croppingItemIndex !== null && items[croppingItemIndex] && (
+            {croppingItemIndex !== null && items[croppingItemIndex] && items[croppingItemIndex].type === 'image' && (
                 <ImageCropper
                     imageSrc={getCleanUrl(items[croppingItemIndex].url)}
                     onCancel={() => setCroppingItemIndex(null)}
                     onCropComplete={handleCropSave}
+                />
+            )}
+
+            {croppingItemIndex !== null && items[croppingItemIndex] && items[croppingItemIndex].type === 'video' && (
+                <VideoEditor
+                    videoSrc={getCleanUrl(items[croppingItemIndex].url)}
+                    onCancel={() => setCroppingItemIndex(null)}
+                    onSave={handleVideoSave}
                 />
             )}
 
@@ -260,16 +321,24 @@ export default function MediaUpload({
                                 )}
                             </div>
                             {/* Hover Controls */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
-                                {items[0].type === 'image' && (
+                            <div className="absolute inset-x-0 bottom-0 p-3 flex justify-end gap-2 md:bg-gradient-to-t md:from-black/80 md:via-transparent md:to-transparent md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                {items[0] && (
                                     <button
                                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCroppingItemIndex(0); }}
                                         type="button"
-                                        className="px-4 py-2 bg-white text-black rounded-xl font-bold text-sm hover:bg-white/90 flex items-center gap-2 shadow-lg"
+                                        className="px-3 py-2 bg-white text-black rounded-lg font-bold text-xs hover:bg-white/90 flex items-center gap-2 shadow-lg"
                                     >
-                                        <Pencil size={16} /> Adjust Frame
+                                        <Pencil size={14} />
+                                        <span className="hidden sm:inline">Adjust</span>
                                     </button>
                                 )}
+                                <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(0); }}
+                                    type="button"
+                                    className="px-3 py-2 bg-red-500 text-white rounded-lg font-bold text-xs hover:bg-red-600 flex items-center gap-2 shadow-lg"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
                             </div>
                             <p className="absolute bottom-3 left-3 text-white/60 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
                                 This is exactly how your venue will appear on the explore page
@@ -301,8 +370,35 @@ export default function MediaUpload({
                                                 )}
                                             </div>
 
-                                            {/* Hover Controls */}
-                                            <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
+                                            {/* Mobile Controls (Always Visible) */}
+                                            <div className="md:hidden absolute bottom-0 left-0 w-full bg-black/80 p-1.5 flex items-center gap-2">
+                                                <button
+                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); makeMain(actualIndex); }}
+                                                    type="button"
+                                                    className="flex-1 px-2 py-1.5 bg-indigo-600 rounded-md text-[10px] font-bold text-white flex items-center justify-center gap-1 active:scale-95 transition-transform"
+                                                >
+                                                    ★ Main
+                                                </button>
+                                                {item.type !== 'pdf' && (
+                                                    <button
+                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCroppingItemIndex(actualIndex); }}
+                                                        type="button"
+                                                        className="p-1.5 bg-white/10 rounded-md text-white active:bg-white/20"
+                                                    >
+                                                        <Pencil size={12} />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(actualIndex); }}
+                                                    type="button"
+                                                    className="p-1.5 bg-red-500/20 rounded-md text-red-200 active:bg-red-500/30"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
+
+                                            {/* Desktop Controls (Hover Only) */}
+                                            <div className="hidden md:flex absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex-col items-center justify-center gap-2 p-2">
                                                 <button
                                                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); makeMain(actualIndex); }}
                                                     type="button"
@@ -311,7 +407,7 @@ export default function MediaUpload({
                                                     ★ Make Main
                                                 </button>
                                                 <div className="flex gap-2 w-full">
-                                                    {item.type === 'image' && (
+                                                    {item.type !== 'pdf' && (
                                                         <button
                                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCroppingItemIndex(actualIndex); }}
                                                             type="button"

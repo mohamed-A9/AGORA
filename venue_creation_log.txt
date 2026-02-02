@@ -79,3 +79,25 @@
 [2026-01-30T09:20:40.950Z] DB Check Result: None
 [2026-01-30T09:20:40.950Z] About to create venue with Cat: CAFE, Slug: test-55740
 [2026-01-30T09:20:40.950Z] ✅ SUCCESS: Created ID cml0oaj060001taocarcvjqwq
+
+[2026-01-31T20:37:48.182Z] Attempt: Name="test", Cat="RESTAURANT"
+[2026-01-31T20:37:48.182Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-01-31T20:37:48.182Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=test)
+[2026-01-31T20:37:48.182Z] ❌ ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].venue.findFirst()` invocation in
+C:\Users\m.fatih\Desktop\agora\.next\dev\server\chunks\ssr\[root-of-the-server]__c4148a68._.js:535:163
+
+  532 // ... rest of function
+  533 // 1. CHECK FOR EXISTING DRAFT (Dup Check)
+  534 __TURBOPACK__imported__module__$5b$externals$5d2f$fs__$5b$external$5d$__$28$fs$2c$__cjs$29$__["default"].appendFileSync(logFile, `[${timestamp}] Checking DB for existing draft... (Owner=${userId}, Name=${name})\n`);
+→ 535 const existingDraft = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].venue.findFirst(
+Can't reach database server at `ep-icy-bread-aglctt4d-pooler.c-2.eu-central-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-icy-bread-aglctt4d-pooler.c-2.eu-central-1.aws.neon.tech:5432`.
+
+[2026-02-01T13:19:08.055Z] Attempt: Name="TEST OFFICE", Cat="CAFE"
+[2026-02-01T13:19:08.055Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-02-01T13:19:08.055Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=TEST OFFICE)
+[2026-02-01T13:19:08.055Z] DB Check Result: None
+[2026-02-01T13:19:08.055Z] About to create venue with Cat: CAFE, Slug: test-office-54374
+[2026-02-01T13:19:08.055Z] ✅ SUCCESS: Created ID cml3rovty0001taiki3pu8814

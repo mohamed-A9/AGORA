@@ -2,19 +2,20 @@
 
 import { useState, useCallback } from "react";
 import Cropper from "react-easy-crop";
-import { X, Check } from "lucide-react";
+import { X, Check, RotateCw } from "lucide-react";
 import getCroppedImg from "@/lib/cropImage"; // We'll create this util
 
 interface ImageCropperProps {
     imageSrc: string;
     onCancel: () => void;
-    onCropComplete: (croppedAreaPixels: any) => void;
+    onCropComplete: (croppedAreaPixels: any, rotation: number) => void;
     aspect?: number;
 }
 
 export default function ImageCropper({ imageSrc, onCancel, onCropComplete, aspect = 4 / 3 }: ImageCropperProps) {
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
+    const [rotation, setRotation] = useState(0);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
 
     const onCropChange = (crop: { x: number; y: number }) => {
@@ -25,12 +26,14 @@ export default function ImageCropper({ imageSrc, onCancel, onCropComplete, aspec
         setZoom(zoom);
     };
 
+    // onRotationChange is handled inline
+
     const onCropCompleteHandler = useCallback((croppedArea: any, croppedAreaPixels: any) => {
         setCroppedAreaPixels(croppedAreaPixels);
     }, []);
 
     const handleSave = () => {
-        onCropComplete(croppedAreaPixels);
+        onCropComplete(croppedAreaPixels, rotation);
     };
 
     return (
@@ -48,16 +51,19 @@ export default function ImageCropper({ imageSrc, onCancel, onCropComplete, aspec
                         image={imageSrc}
                         crop={crop}
                         zoom={zoom}
+                        rotation={rotation}
                         aspect={aspect}
                         onCropChange={onCropChange}
                         onZoomChange={onZoomChange}
+                        onRotationChange={setRotation}
                         onCropComplete={onCropCompleteHandler}
                     />
                 </div>
 
                 <div className="p-4 bg-zinc-900 border-t border-white/10 flex flex-col gap-4">
+                    {/* Zoom Control */}
                     <div className="flex items-center gap-4">
-                        <span className="text-xs text-white/50">Zoom</span>
+                        <span className="text-xs text-white/50 w-12">Zoom</span>
                         <input
                             type="range"
                             value={zoom}
@@ -70,7 +76,21 @@ export default function ImageCropper({ imageSrc, onCancel, onCropComplete, aspec
                         />
                     </div>
 
-                    <div className="flex justify-end gap-3">
+                    {/* Rotation Control */}
+                    <div className="flex items-center gap-4">
+                        <span className="text-xs text-white/50 w-12">Rotate</span>
+                        <button
+                            type="button"
+                            onClick={() => setRotation((prev) => (prev + 90) % 360)}
+                            className="p-2 bg-zinc-800 hover:bg-zinc-700 border border-white/10 rounded-lg text-white transition-colors flex items-center gap-2"
+                            title="Rotate 90°"
+                        >
+                            <RotateCw size={18} />
+                            <span className="text-xs font-medium">Rotate 90°</span>
+                        </button>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2">
                         <button
                             type="button" // Prevent form submission
                             onClick={onCancel}
@@ -84,7 +104,7 @@ export default function ImageCropper({ imageSrc, onCancel, onCropComplete, aspec
                             className="px-6 py-2 rounded-xl bg-white text-black font-semibold hover:bg-zinc-200 transition-colors flex items-center gap-2"
                         >
                             <Check size={18} />
-                            Save Crop
+                            Save
                         </button>
                     </div>
                 </div>

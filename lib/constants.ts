@@ -1,10 +1,11 @@
 
 export const moroccanCities = [
-    "Casablanca", "Rabat", "Marrakech", "Agadir", "Tangier", "Fes", "Meknes",
-    "Oujda", "Kenitra", "Tetouan", "Safi", "Mohammedia", "El Jadida", "Beni Mellal",
-    "Nador", "Taza", "Settat", "Berrechid", "Khemisset", "Inezgane", "Ksar El Kebir",
-    "Larache", "Guelmim", "Khouribga", "Errachidia", "Essaouira", "Dakhla", "Laayoune"
-].sort();
+    "Casablanca", "Rabat", "Kenitra", "Marrakech", "Fes", "Agadir",
+    "Beni Mellal", "Berrechid", "Dakhla", "El Jadida", "Errachidia", "Essaouira",
+    "Guelmim", "Inezgane", "Khemisset", "Khouribga", "Ksar El Kebir", "Laayoune",
+    "Larache", "Meknes", "Mohammedia", "Nador", "Oujda", "Safi", "Settat",
+    "Tangier", "Taza", "Tetouan"
+];
 
 export const VENUE_CATEGORIES = ["Restaurant", "Club", "Cafe", "Rooftop", "Lounge", "Bar", "Beach Club"];
 export const DRESS_CODES = ["Casual", "Smart Casual", "Formal", "Beachwear", "Sporty", "No Dress Code"];

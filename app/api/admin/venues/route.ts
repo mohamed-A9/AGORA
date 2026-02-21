@@ -16,8 +16,11 @@ export async function GET(req: Request) {
   const where: any = {};
 
   if (status !== "ALL") {
-    // ✅ enum VenueStatus: PENDING | APPROVED | REJECTED
-    where.status = status;
+    if (status === "PENDING") {
+      where.status = { in: ["PENDING", "PENDING_APPROVAL"] };
+    } else {
+      where.status = status;
+    }
   }
 
   if (q) {

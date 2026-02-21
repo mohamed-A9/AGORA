@@ -101,3 +101,55 @@ Please make sure your database server is running at `ep-icy-bread-aglctt4d-poole
 [2026-02-01T13:19:08.055Z] DB Check Result: None
 [2026-02-01T13:19:08.055Z] About to create venue with Cat: CAFE, Slug: test-office-54374
 [2026-02-01T13:19:08.055Z] ✅ SUCCESS: Created ID cml3rovty0001taiki3pu8814
+
+[2026-02-03T08:05:54.838Z] Attempt: Name="TEST", Cat="CAFE"
+[2026-02-03T08:05:54.838Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-02-03T08:05:54.838Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=TEST)
+[2026-02-03T08:05:54.838Z] DB Check Result: None
+[2026-02-03T08:05:54.838Z] About to create venue with Cat: CAFE, Slug: test-35090
+[2026-02-03T08:05:54.838Z] ❌ ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].venue.create()` invocation in
+C:\Users\m.fatih\Desktop\agora\.next\dev\server\chunks\ssr\[root-of-the-server]__c4148a68._.js:580:155
+
+  577 if (mainCategory === "ACTIVITIES_&_FUN") mainCategory = "ACTIVITIES_FUN";
+  578 if (mainCategory === "WELLNESS_&_HEALTH") mainCategory = "WELLNESS_HEALTH";
+  579 __TURBOPACK__imported__module__$5b$externals$5d2f$fs__$5b$external$5d$__$28$fs$2c$__cjs$29$__["default"].appendFileSync(logFile, `[${timestamp}] About to create venue with Cat: ${mainCategory}, Slug: ${slug}\n`);
+→ 580 const venue = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].venue.create(
+Foreign key constraint violated on the constraint: `Venue_ownerId_fkey`
+
+[2026-02-03T08:16:15.172Z] Attempt: Name="Hacienda", Cat="RESTAURANT"
+[2026-02-03T08:16:15.172Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-02-03T08:16:15.172Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=Hacienda)
+[2026-02-03T08:16:15.172Z] DB Check Result: None
+[2026-02-03T08:16:15.172Z] About to create venue with Cat: RESTAURANT, Slug: hacienda-12115
+[2026-02-03T08:16:15.172Z] ❌ ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].venue.create()` invocation in
+C:\Users\m.fatih\Desktop\agora\.next\dev\server\chunks\ssr\[root-of-the-server]__c4148a68._.js:580:155
+
+  577 if (mainCategory === "ACTIVITIES_&_FUN") mainCategory = "ACTIVITIES_FUN";
+  578 if (mainCategory === "WELLNESS_&_HEALTH") mainCategory = "WELLNESS_HEALTH";
+  579 __TURBOPACK__imported__module__$5b$externals$5d2f$fs__$5b$external$5d$__$28$fs$2c$__cjs$29$__["default"].appendFileSync(logFile, `[${timestamp}] About to create venue with Cat: ${mainCategory}, Slug: ${slug}\n`);
+→ 580 const venue = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].venue.create(
+Foreign key constraint violated on the constraint: `Venue_ownerId_fkey`
+
+[2026-02-03T08:16:19.943Z] Attempt: Name="Hacienda", Cat="RESTAURANT"
+[2026-02-03T08:16:19.943Z] UserID: cmkpcwl730000ta8kdp2k3hl0
+[2026-02-03T08:16:19.943Z] Checking DB for existing draft... (Owner=cmkpcwl730000ta8kdp2k3hl0, Name=Hacienda)
+[2026-02-03T08:16:19.943Z] DB Check Result: None
+[2026-02-03T08:16:19.943Z] About to create venue with Cat: RESTAURANT, Slug: hacienda-14861
+[2026-02-03T08:16:19.943Z] ❌ ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].venue.create()` invocation in
+C:\Users\m.fatih\Desktop\agora\.next\dev\server\chunks\ssr\[root-of-the-server]__c4148a68._.js:580:155
+
+  577 if (mainCategory === "ACTIVITIES_&_FUN") mainCategory = "ACTIVITIES_FUN";
+  578 if (mainCategory === "WELLNESS_&_HEALTH") mainCategory = "WELLNESS_HEALTH";
+  579 __TURBOPACK__imported__module__$5b$externals$5d2f$fs__$5b$external$5d$__$28$fs$2c$__cjs$29$__["default"].appendFileSync(logFile, `[${timestamp}] About to create venue with Cat: ${mainCategory}, Slug: ${slug}\n`);
+→ 580 const venue = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].venue.create(
+Foreign key constraint violated on the constraint: `Venue_ownerId_fkey`
+
+[2026-02-16T13:11:59.737Z] Attempt: Name="TEST", Cat="CAFE"
+[2026-02-16T13:11:59.737Z] UserID: cml6q9h9s0008taik4wn3ilps
+[2026-02-16T13:11:59.737Z] Checking DB for existing draft... (Owner=cml6q9h9s0008taik4wn3ilps, Name=TEST)
+[2026-02-16T13:11:59.737Z] DB Check Result: None
+[2026-02-16T13:11:59.737Z] About to create venue with Cat: CAFE, Slug: test-12543
+[2026-02-16T13:11:59.737Z] ✅ SUCCESS: Created ID cmlp71hd80001tapktdh7ao3r

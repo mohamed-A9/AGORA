@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { deleteVenue } from "@/actions/venue-management";
+import { deleteVenue, updateVenueStatus } from "@/actions/venue-management";
 
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
@@ -33,6 +33,16 @@ export default function MyVenuesPage() {
             alert("Error deleting venue");
         }
         setDeleteId(null);
+    }
+
+    async function handleStatusChange(id: string, newStatus: string) {
+        const res = await updateVenueStatus(id, newStatus);
+        if (res.success) {
+            setVenues(venues.map(v => v.id === id ? { ...v, status: newStatus } : v));
+            router.refresh();
+        } else {
+            alert("Error updating status");
+        }
     }
 
     return (
@@ -83,44 +93,95 @@ export default function MyVenuesPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {venues.map((v) => (
-                    <div key={v.id} className="group relative bg-white/5 border border-white/10 p-6 rounded-3xl flex flex-col justify-between gap-4 transition-all duration-300 hover:bg-white/10 hover:border-white/20 hover:translate-y-[-4px] hover:shadow-xl">
+                    <div key={v.id} className="group relative bg-white/5 border border-white/10 rounded-3xl flex flex-col justify-between overflow-hidden transition-all duration-300 hover:bg-white/10 hover:border-white/20 hover:translate-y-[-4px] hover:shadow-xl">
 
-                        {/* Header */}
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-start">
-                                <span className={`text-[10px] px-2 py-1 rounded-full border tracking-wide font-bold uppercase ${v.status === 'APPROVED' ? 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10' :
-                                    v.status === 'PENDING' ? 'border-amber-500/30 text-amber-300 bg-amber-500/10' :
-                                        'border-red-500/30 text-red-300 bg-red-500/10'
+                        {/* Image / Header Area */}
+                        <div className="relative h-48 w-full bg-white/5">
+                            {v.coverImageUrl ? (
+                                <img
+                                    src={v.coverImageUrl}
+                                    alt={v.name}
+                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-white/5">
+                                    <span className="text-4xl opacity-20">🏠</span>
+                                </div>
+                            )}
+
+                            {/* Overlay Gradient */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent opacity-80" />
+
+                            {/* Status Badge */}
+                            <div className="absolute top-4 left-4">
+                                <span className={`text-[10px] px-2 py-1 rounded-full border tracking-wide font-bold uppercase backdrop-blur-md shadow-sm ${v.status === 'APPROVED' ? 'border-emerald-500/30 text-emerald-200 bg-emerald-500/40' :
+                                        v.status === 'PENDING' ? 'border-amber-500/30 text-amber-200 bg-amber-500/40' :
+                                            'border-white/20 text-white/80 bg-white/10'
                                     }`}>
                                     {v.status}
                                 </span>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => setDeleteId(v.id)} className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Delete">
-                                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-                                    </button>
-                                </div>
                             </div>
 
+                            {/* Delete Action */}
+                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    onClick={(e) => { e.preventDefault(); setDeleteId(v.id); }}
+                                    className="p-2 bg-black/40 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm transition-all"
+                                    title="Delete"
+                                >
+                                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Content Body */}
+                        <div className="p-6 flex flex-col gap-4 flex-1 -mt-2 relative">
                             <div>
                                 <h2 className="text-xl font-bold text-white leading-tight">{v.name}</h2>
                                 <div className="text-white/50 text-sm mt-1 font-medium">{typeof v.city === 'object' ? v.city?.name : v.city} • {v.category || "Venue"}</div>
                             </div>
-                        </div>
 
-                        {/* Footer Actions */}
-                        <div className="pt-4 border-t border-white/5 flex items-center gap-2 mt-2">
-                            <Link
-                                href={v.status === 'DRAFT' ? `/business/add-venue?id=${v.id}` : `/business/edit-venue/${v.id}`}
-                                className="flex-1 text-center bg-white/10 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-indigo-500 hover:text-white transition-all"
-                            >
-                                {v.status === 'DRAFT' ? 'Continue Draft' : 'Edit Details'}
-                            </Link>
-                            <Link
-                                href={`/venue/${v.id}`}
-                                className="px-4 py-2.5 rounded-xl border border-white/10 text-white/70 hover:text-white hover:border-white/30 transition-colors"
-                            >
-                                Preview
-                            </Link>
+                            {/* Footer Actions */}
+                            <div className="pt-4 border-t border-white/5 space-y-2 mt-auto">
+                                <div className="flex items-center gap-2">
+                                    {v.status === 'PENDING' ? (
+                                        <button disabled className="flex-1 text-center bg-white/5 text-white/30 py-2.5 rounded-xl text-sm font-semibold cursor-not-allowed">
+                                            Processing...
+                                        </button>
+                                    ) : (
+                                        <Link
+                                            href={v.status === 'DRAFT' ? `/business/add-venue?id=${v.id}` : `/business/edit-venue/${v.id}`}
+                                            className="flex-1 text-center bg-white/10 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-indigo-500 hover:text-white transition-all"
+                                        >
+                                            {v.status === 'DRAFT' ? 'Continue Draft' : 'Edit Details'}
+                                        </Link>
+                                    )}
+                                    <Link
+                                        href={`/venue/${v.id}`}
+                                        className="px-4 py-2.5 rounded-xl border border-white/10 text-white/70 hover:text-white hover:border-white/30 transition-colors"
+                                    >
+                                        Preview
+                                    </Link>
+                                </div>
+
+                                {v.status === 'DRAFT' && (
+                                    <button
+                                        onClick={() => handleStatusChange(v.id, 'PENDING')}
+                                        className="w-full py-2.5 rounded-xl text-sm font-semibold bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500 hover:text-white border border-indigo-500/30 transition-all"
+                                    >
+                                        Submit for Review
+                                    </button>
+                                )}
+
+                                {v.status === 'PENDING' && (
+                                    <button
+                                        onClick={() => handleStatusChange(v.id, 'DRAFT')}
+                                        className="w-full py-2.5 rounded-xl text-sm font-semibold bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-white border border-amber-500/30 transition-all"
+                                    >
+                                        Back to Draft (Edit)
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 ))}

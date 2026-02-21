@@ -1,11 +1,12 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
+import { deleteMyAccount } from "@/actions/account";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { moroccanCities, VENUE_CATEGORIES, AMBIANCES } from "@/lib/constants";
-import { Check, Settings, MapPin, Sparkles, Utensils, Lock, ShieldCheck, Eye, EyeOff, LayoutDashboard, Plus } from "lucide-react";
+import { Check, Settings, MapPin, Sparkles, Utensils, Lock, ShieldCheck, Eye, EyeOff, LayoutDashboard, Plus, Trash2, AlertTriangle, X } from "lucide-react";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
@@ -18,6 +19,7 @@ export default function ProfilePage() {
     preferredAmbiances: [] as string[],
     hasPassword: true, // Default to true to avoid flashing "Create Password" for normal users
   });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
@@ -275,8 +277,37 @@ export default function ProfilePage() {
             </div>
           </section>
         )}
+        {/* Danger Zone */}
+        <section className="rounded-[2.5rem] border border-red-500/10 bg-red-500/5 p-8 backdrop-blur-xl">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-white">Zone de Danger</h2>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 rounded-3xl bg-red-500/10 border border-red-500/10">
+            <div>
+              <h3 className="text-lg font-bold text-white">Supprimer le compte</h3>
+              <p className="text-red-300 text-sm mt-1">Cette action est irréversible. Toutes vos données seront supprimées.</p>
+            </div>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="px-6 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold transition-colors whitespace-nowrap disabled:opacity-50"
+            >
+              Supprimer mon compte
+            </button>
+          </div>
+        </section>
       </div>
+
+      <DeleteAccountModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        hasPassword={prefs.hasPassword}
+      />
     </div>
+
   );
 }
 
@@ -427,6 +458,98 @@ function PrefGroup({ title, icon: Icon, iconColor, items, selected, onToggle }: 
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function DeleteAccountModal({ isOpen, onClose, hasPassword }: { isOpen: boolean, onClose: () => void, hasPassword: boolean }) {
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  async function handleConfirm() {
+    setLoading(true);
+    setError(null);
+
+    // Pass password if hasPassword is true, or empty string (which validated by server if not required)
+    const res = await deleteMyAccount(password);
+
+    if (res?.success) {
+      await signOut({ callbackUrl: '/' });
+    } else {
+      setError(res?.error || "Erreur de suppression");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-zinc-900 border border-red-500/30 rounded-[2rem] p-8 shadow-2xl relative overflow-hidden">
+        {/* Background warning pattern */}
+        <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-red-500/50 via-transparent to-transparent" />
+
+        <button onClick={onClose} className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+          <X size={24} />
+        </button>
+
+        <div className="flex flex-col items-center text-center gap-6 relative z-10">
+          <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-2 animate-pulse">
+            <AlertTriangle className="w-10 h-10 text-red-500" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-white uppercase tracking-tight">Suppression Définitive</h2>
+            <p className="text-red-400 font-medium">Attention: Cette action est irréversible.</p>
+          </div>
+
+          <div className="text-white/60 text-sm space-y-2 bg-red-500/5 p-4 rounded-2xl border border-red-500/10">
+            <p>En confirmant, vous allez supprimer :</p>
+            <ul className="list-disc list-inside text-left space-y-1 ml-4">
+              <li>Votre profil utilisateur</li>
+              <li>Tous vos établissements (Venues)</li>
+              <li>Vos réservations et favoris</li>
+              <li>Toutes vos données associées</li>
+            </ul>
+          </div>
+
+          {hasPassword && (
+            <div className="w-full space-y-2 text-left">
+              <label className="text-xs uppercase font-bold text-white/40 ml-1">Confirmation par mot de passe</label>
+              <input
+                type="password"
+                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-red-500 transition-all font-bold placeholder-white/20"
+                placeholder="Entrez votre mot de passe"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          )}
+
+          {error && (
+            <div className="text-red-400 text-sm font-bold bg-red-950/50 px-4 py-2 rounded-lg w-full">
+              {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 w-full mt-2">
+            <button
+              onClick={onClose}
+              className="py-4 rounded-xl font-bold text-white bg-white/5 hover:bg-white/10 transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={loading || (hasPassword && !password)}
+              className="py-4 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-red-600/20 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
+            >
+              {loading ? "Suppression..." : "Tout Supprimer"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

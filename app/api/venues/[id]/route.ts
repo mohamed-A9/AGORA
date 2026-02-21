@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
 
@@ -11,10 +11,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     const venue = await prisma.venue.findUnique({
       where: { id },
       include: {
-        gallery: true, // properties: id, url, kind...
-        events: {
-          // include: { media: true } // Media relation on Event might be missing or named differently. Removing to be safe for now.
-        },
+        gallery: { orderBy: { sortOrder: 'asc' } },
+        events: {},
         owner: { select: { id: true, name: true } },
         reviews: {
           include: { user: { select: { name: true } } },
@@ -31,28 +29,59 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     if (!venue) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
 
-    // For development, we allow viewing all venues or check isActive
-    // if (!venue.isActive) return NextResponse.json({ error: "NOT_ACTIVE" }, { status: 404 });
-
     return NextResponse.json({ venue });
+  } catch (e: any) {
+    return NextResponse.json({ error: "SERVER_ERROR", message: e?.message || "unknown" }, { status: 500 });
+  }
+}
 
-    /*
-    // ✅ Only APPROVED venues are public
-    if (venue.status === "APPROVED") return NextResponse.json({ venue });
+/**
+ * PATCH /api/venues/[id]
+ * Saves lightweight wizard state fields (wizardStep, etc.)
+ * For full field updates use updateVenueStep server action.
+ */
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await ctx.params;
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    // ✅ sinon: uniquement owner business ou admin
-    const token = await getToken({ req: req as any, secret: process.env.NEXTAUTH_SECRET });
-    if (!token) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
-
-    const uid = token.uid as string;
-    const role = token.role as string;
-
-    if (role === "ADMIN" || uid === venue.ownerId) {
-      return NextResponse.json({ venue });
+    if (!token) {
+      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     }
 
-    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
-    */
+    const body = await req.json();
+
+    // Find venue and verify ownership
+    const venue = await prisma.venue.findUnique({
+      where: { id },
+      select: { id: true, ownerId: true },
+    });
+
+    if (!venue) {
+      return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+    }
+
+    const uid = token.uid as string || token.sub as string;
+    const role = token.role as string;
+
+    if (role !== "ADMIN" && venue.ownerId !== uid) {
+      return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    }
+
+    // Only allow updating safe, non-sensitive fields via this endpoint
+    const allowed: Record<string, any> = {};
+    if (typeof body.wizardStep === 'number') allowed.wizardStep = body.wizardStep;
+
+    if (Object.keys(allowed).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+
+    await prisma.venue.update({
+      where: { id },
+      data: allowed,
+    });
+
+    return NextResponse.json({ success: true });
   } catch (e: any) {
     return NextResponse.json({ error: "SERVER_ERROR", message: e?.message || "unknown" }, { status: 500 });
   }

@@ -4,10 +4,17 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { Menu, X, User, LayoutDashboard, Calendar, Store, LogOut, Settings } from "lucide-react";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 
 export default function Header() {
     const { data: session, status } = useSession();
     const [isOpen, setIsOpen] = useState(false);
+    const pathname = usePathname();
+
+    // Hide Header on specific pages for distinct focus or full-screen layout
+    if (pathname === "/complete-profile" || pathname === "/verify-email") {
+        return null;
+    }
 
     // Helper to close menu
     const close = () => setIsOpen(false);

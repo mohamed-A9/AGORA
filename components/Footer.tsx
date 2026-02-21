@@ -1,8 +1,13 @@
 "use client";
 
 import { Mail, Phone } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 export default function Footer() {
+    const pathname = usePathname();
+
+    if (pathname === "/complete-profile" || pathname === "/verify-email") return null;
+
     return (
         <footer className="bg-black/40 border-t border-white/5 py-12 mt-12 bg-opacity-30 backdrop-blur-lg">
             <div className="max-w-7xl mx-auto px-4 flex flex-col items-center justify-center gap-6 text-center">

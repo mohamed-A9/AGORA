@@ -5,17 +5,27 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LayoutDashboard, Plus, Calendar, Settings, TrendingUp, Users, MapPin, ChevronRight, Bell } from "lucide-react";
 
+import Link from "next/link";
+import { getBusinessStats } from "@/actions/business-dashboard";
+
 export default function BusinessDashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [stats, setStats] = useState({ venues: 0, reservations: 0, views: 0, engagement: 0 });
 
   const role = (session?.user as any)?.role;
   const name = (session?.user as any)?.name || "Partner";
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
-    if (status === "authenticated" && role !== "BUSINESS" && role !== "ADMIN") {
-      router.replace("/dashboard");
+    if (status === "authenticated") {
+      if (role !== "BUSINESS" && role !== "ADMIN") {
+        router.replace("/dashboard");
+      } else {
+        getBusinessStats().then(data => {
+          if (data) setStats(data);
+        });
+      }
     }
   }, [status, role, router]);
 
@@ -49,10 +59,10 @@ export default function BusinessDashboardPage() {
 
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={MapPin} label="Active Venues" value="3" color="indigo" />
-        <StatCard icon={Users} label="Total Views" value="1.2k" color="fuchsia" />
-        <StatCard icon={Calendar} label="Reservations" value="12" color="emerald" />
-        <StatCard icon={TrendingUp} label="Engagement" value="+24%" color="amber" />
+        <StatCard icon={MapPin} label="Active Venues" value={stats.venues} color="indigo" href="/business/my-venues" />
+        <StatCard icon={Users} label="Total Views" value={stats.views} color="fuchsia" />
+        <StatCard icon={Calendar} label="Reservations" value={stats.reservations} color="emerald" href="/business/reservations" />
+        <StatCard icon={TrendingUp} label="Engagement" value={`${stats.engagement}%`} color="amber" />
       </div>
 
       {/* Main Actions Grid */}
@@ -133,7 +143,7 @@ export default function BusinessDashboardPage() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, color }: any) {
+function StatCard({ icon: Icon, label, value, color, href }: any) {
   const colors = {
     indigo: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
     fuchsia: "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20",
@@ -144,8 +154,8 @@ function StatCard({ icon: Icon, label, value, color }: any) {
   // @ts-ignore
   const theme = colors[color] || colors.indigo;
 
-  return (
-    <div className={`p-4 rounded-2xl border backdrop-blur-sm ${theme} flex flex-col items-center justify-center text-center gap-2 transition hover:scale-105`}>
+  const content = (
+    <div className={`p-4 rounded-2xl border backdrop-blur-sm ${theme} flex flex-col items-center justify-center text-center gap-2 transition hover:scale-105 h-full ${href ? 'cursor-pointer' : ''}`}>
       <Icon className="w-6 h-6 opacity-80" />
       <div>
         <div className="text-2xl font-bold text-white">{value}</div>
@@ -153,6 +163,16 @@ function StatCard({ icon: Icon, label, value, color }: any) {
       </div>
     </div>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="block h-full">
+        {content}
+      </Link>
+    )
+  }
+
+  return content;
 }
 
 function ActionCard({ title, desc, icon: Icon, onClick, primary, disabled }: any) {

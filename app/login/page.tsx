@@ -154,8 +154,9 @@ function LoginPageContent() {
                 <div className="flex flex-col gap-2.5">
                   <button
                     onClick={() => {
-                      Cookies.remove("signup-role", { path: '/' }); // Clear any old signup-role
+                      Cookies.remove("signup-role", { path: '/' });
                       Cookies.set("login-role", intendedRole, { expires: 1, path: '/' });
+                      Cookies.set("auth_intent", "login", { expires: 1, path: '/' });
                       signIn("google", { callbackUrl: "/home" });
                     }}
                     className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/10"
@@ -171,8 +172,9 @@ function LoginPageContent() {
 
                   <button
                     onClick={() => {
-                      Cookies.remove("signup-role", { path: '/' }); // Clear any old signup-role
+                      Cookies.remove("signup-role", { path: '/' });
                       Cookies.set("login-role", intendedRole, { expires: 1, path: '/' });
+                      Cookies.set("auth_intent", "login", { expires: 1, path: '/' });
                       signIn("facebook", { callbackUrl: "/home" });
                     }}
                     className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-[#1877F2]/20 px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1877F2]/30"

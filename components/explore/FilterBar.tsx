@@ -28,7 +28,7 @@ export default function FilterBar() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [q, setQ] = useState("");
 
-    const currentCity = searchParams.get("city") || "Casablanca";
+    const currentCity = searchParams.get("city") || "All Cities";
     const currentCategory = searchParams.get("category");
 
     useEffect(() => {
@@ -81,13 +81,17 @@ export default function FilterBar() {
     const changeCity = (city: string) => {
         setCityMenuOpen(false);
         const params = new URLSearchParams(searchParams.toString());
-        params.set("city", city);
+        if (city === "All Cities") {
+            params.delete("city");
+        } else {
+            params.set("city", city);
+        }
         router.push(pathname + "?" + params.toString());
     }
 
     const applySidebarFilters = (newFilters: any) => {
         const params = new URLSearchParams();
-        if (newFilters.city) params.set("city", newFilters.city);
+        if (newFilters.city && newFilters.city !== "All Cities") params.set("city", newFilters.city);
         if (q) params.set("q", q);
         const arrayKeys = ["category", "subcategory", "specialization", "ambiance", "cuisine", "musicStyle", "paymentMethods"];
         arrayKeys.forEach(k => {
@@ -142,6 +146,15 @@ export default function FilterBar() {
                                 {cityMenuOpen && (
                                     <div className="absolute top-full left-0 mt-2 w-56 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                                         <div className="p-1 space-y-0.5">
+                                            <button
+                                                onClick={() => changeCity("All Cities")}
+                                                className={`w-full text-left px-3 py-2.5 text-sm rounded-lg transition-all ${currentCity === "All Cities"
+                                                    ? "bg-white/10 text-white font-bold"
+                                                    : "text-white/60 hover:bg-white/5 hover:text-white"
+                                                    }`}
+                                            >
+                                                All Cities
+                                            </button>
                                             {moroccanCities.map(c => (
                                                 <button
                                                     key={c}

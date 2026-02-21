@@ -135,6 +135,13 @@ function SignUpPageContent() {
           "The selected email may already be in use with a different account type.\n" +
           "Please try a different email or contact support."
         );
+      } else if (error === "AccountNotFound") {
+        console.log('✅ AccountNotFound error detected');
+        setError(
+          "⚠️ Account Not Found\n\n" +
+          "It looks like you don't have an account with us yet.\n" +
+          "Please select your account type below and create a new account."
+        );
       } else {
         console.log('⚠️ Generic error detected:', error);
         setError(`⚠️ Authentication Error\n\nPlease try again or contact support.`);
@@ -271,8 +278,9 @@ function SignUpPageContent() {
                 <div className="flex flex-col gap-2.5">
                   <button
                     onClick={() => {
-                      Cookies.remove("login-role", { path: '/' }); // Clear any old login-role
+                      Cookies.remove("login-role", { path: '/' });
                       Cookies.set("signup-role", role, { expires: 1, path: '/' });
+                      Cookies.set("auth_intent", "signup", { expires: 1, path: '/' });
                       signIn("google", { callbackUrl: "/" });
                     }}
                     className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/10"
@@ -288,8 +296,9 @@ function SignUpPageContent() {
 
                   <button
                     onClick={() => {
-                      Cookies.remove("login-role", { path: '/' }); // Clear any old login-role
+                      Cookies.remove("login-role", { path: '/' });
                       Cookies.set("signup-role", role, { expires: 1, path: '/' });
+                      Cookies.set("auth_intent", "signup", { expires: 1, path: '/' });
                       signIn("facebook", { callbackUrl: "/" });
                     }}
                     className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-[#1877F2]/20 px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1877F2]/30"

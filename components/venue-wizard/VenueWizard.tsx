@@ -16,37 +16,35 @@ import ConfirmationModal from "../ui/ConfirmationModal";
 export default function VenueWizard({ initialId }: { initialId?: string | null }) {
     const router = useRouter();
     const [step, setStep] = useState(1);
-    const [venueId, setVenueId] = useState<string | null>(initialId || null);
+    const [venueId, setVenueId] = useState<string | null>(() => {
+        if (initialId && initialId !== "undefined" && initialId !== "null") return initialId;
+        return null;
+    });
+
+    // ... (rest of state)
+
+    // Helper to set venueId safely
+    const setSafeVenueId = (id: string | null) => {
+        if (!id || id === "undefined" || id === "null") {
+            setVenueId(null);
+        } else {
+            setVenueId(id);
+        }
+    };
     const [draftData, setDraftData] = useState<any>({});
     const [isLoaded, setIsLoaded] = useState(false);
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, onConfirm: () => void }>({ isOpen: false, onConfirm: () => { } });
 
-    // Validation Guard
+    // Validation Guard — only used to prevent jumping FORWARD past incomplete steps
+    // (not used to downgrade when LOADING a saved draft)
     const validateProgress = (targetStep: number, data: any): number => {
-        // Rule: You cannot be on Step N if Step N-1 is incomplete.
-        // We check from Step 1 upwards.
-
-        // Step 1 Check (Must pass to go to Step 2)
         const step1Valid = data.name && data.category && data.coverImageUrl;
         if (!step1Valid) return 1;
         if (targetStep === 1) return 1;
 
-        // Step 2 Check (Must pass to go to Step 3)
         const step2Valid = data.city && data.address;
         if (!step2Valid) return 2;
         if (targetStep === 2) return 2;
-
-        // Step 3 Check (Details - No mandatory fields, so always passes)
-        const step3Valid = true;
-        if (targetStep === 3) return 3;
-
-        // Step 4 Check (Media - Must have >= 5 items to go to Step 5)
-        const gallery = data.media?.filter((m: any) => m.type === 'image' || m.type === 'video') || [];
-        const step4Valid = gallery.length >= 5;
-        if (!step4Valid) return 4;
-        if (targetStep === 4) return 4;
-
-        // Step 5 (Experience) - Mandatory? Assume yes if we add check later.
 
         return targetStep;
     };
@@ -55,17 +53,12 @@ export default function VenueWizard({ initialId }: { initialId?: string | null }
     useEffect(() => {
         const loadDraft = async () => {
             const targetId = initialId || localStorage.getItem("agora_wizard_venue_id");
-            console.log("🔍 [LoadDraft] Starting...");
-            console.log("   - targetId:", targetId);
-            console.log("   - initialId:", initialId);
+            console.log("🔍 [LoadDraft] targetId:", targetId);
 
             if (targetId) {
                 try {
-                    console.log("   📡 Fetching venue from API:", targetId);
                     const res = await fetch(`/api/venues/${targetId}`);
                     const data = await res.json();
-
-                    console.log("   📦 API Response status:", res.status);
 
                     if (data.venue) {
                         const v = data.venue;
@@ -77,72 +70,46 @@ export default function VenueWizard({ initialId }: { initialId?: string | null }
                             city: v.city?.name || v.city
                         };
                         setDraftData(mappedData);
-                        setVenueId(targetId);
-                        console.log("   ✅ Loaded venue from DB:", v.name);
+                        setSafeVenueId(targetId);
+                        console.log("✅ Loaded venue from DB:", v.name);
 
-                        // Restore wizard step from DB (prioritize DB over localStorage)
                         if (!initialId) {
+                            // Trust the DB step — it's the source of truth for where the user was
                             const dbStep = v.wizardStep || 1;
-                            const savedStep = parseInt(localStorage.getItem("agora_wizard_step") || "1");
-
-                            // Determine intended step (max of DB or LocalStorage, but DB is safer source of truth)
-                            let intendedStep = dbStep;
-                            if (savedStep > dbStep) intendedStep = savedStep;
-
-                            // Validate intended step against data
-                            const safeStep = validateProgress(intendedStep, mappedData);
-
-                            if (safeStep !== intendedStep) {
-                                console.log(`   ⚠️ Downgrading step from ${intendedStep} to ${safeStep} due to missing data.`);
-                            }
-
+                            const localStep = parseInt(localStorage.getItem("agora_wizard_step") || "1");
+                            // Take the higher of the two (user might have progressed without DB saving)
+                            const intendedStep = Math.max(dbStep, localStep);
+                            // Only do a soft guard: step 1 if truly blank (no name)
+                            const safeStep = mappedData.name ? intendedStep : 1;
+                            console.log(`📍 Restoring to step ${safeStep} (DB=${dbStep}, local=${localStep})`);
                             setStep(safeStep);
                         }
                     } else if (data.error === "NOT_FOUND" || res.status === 404) {
-                        // Stale ID! Clear everything.
-                        console.warn("   ⚠️ Draft venue not found in DB (stale ID)");
-                        console.log("   🗑️ Clearing stale data...");
-                        setVenueId(null);
-                        setDraftData({}); // CRITICAL: Clear draftData so .id is removed!
+                        console.warn("⚠️ Draft venue not found (stale ID), clearing...");
+                        setSafeVenueId(null);
+                        setDraftData({});
                         localStorage.removeItem("agora_wizard_venue_id");
                         localStorage.removeItem("agora_wizard_step");
                         localStorage.removeItem("agora_wizard_data");
-                        console.log("   ✅ Stale data cleared. Ready for fresh start.");
                     }
                 } catch (err) {
-                    console.error("   ❌ Error loading draft venue:", err);
+                    console.error("❌ Error loading draft venue:", err);
                 }
             } else {
-                console.log("   ℹ️ No targetId found");
-                // No ID at all, check if there's any orphaned data in localStorage
+                // No venue ID — check localStorage for any orphaned data
                 const savedData = localStorage.getItem("agora_wizard_data");
                 const savedStep = localStorage.getItem("agora_wizard_step");
-
-                console.log("   📦 localStorage data:", savedData);
-                console.log("   📍 localStorage step:", savedStep);
-
                 if (savedData) {
                     try {
-                        const parsedData = JSON.parse(savedData);
-                        setDraftData(parsedData);
-                        console.log("   ✅ Restored from localStorage:", parsedData);
-
-                        // Validate localStorage step
-                        if (savedStep) {
-                            const intendedStep = parseInt(savedStep);
-                            const safeStep = validateProgress(intendedStep, parsedData);
-                            if (safeStep !== intendedStep) {
-                                console.log(`   ⚠️ Downgrading localStorage step from ${intendedStep} to ${safeStep} due to missing data.`);
-                            }
-                            setStep(safeStep);
-                        }
+                        const parsed = JSON.parse(savedData);
+                        setDraftData(parsed);
+                        if (savedStep) setStep(parseInt(savedStep));
                     } catch (e) {
-                        console.error("   ❌ Failed to parse saved data:", e);
+                        console.error("❌ Failed to parse saved data:", e);
                     }
                 }
             }
 
-            console.log("   ✅ setIsLoaded(true)");
             setIsLoaded(true);
         };
 
@@ -191,7 +158,7 @@ export default function VenueWizard({ initialId }: { initialId?: string | null }
                     console.log("   ✅ Empty draft created with ID:", data.venueId);
 
                     // Save to state
-                    setVenueId(data.venueId);
+                    setSafeVenueId(data.venueId);
 
                     // Save to localStorage
                     localStorage.setItem("agora_wizard_venue_id", data.venueId);
@@ -228,7 +195,7 @@ export default function VenueWizard({ initialId }: { initialId?: string | null }
         // CRITICAL: Extract venueId from Step 1 if it was just created
         if (data.id && !venueId) {
             console.log("📍 Setting venueId from Step 1:", data.id);
-            setVenueId(data.id);
+            setSafeVenueId(data.id);
             localStorage.setItem("agora_wizard_venue_id", data.id);
         }
 
@@ -325,7 +292,7 @@ export default function VenueWizard({ initialId }: { initialId?: string | null }
                     </button>
                 )}
 
-                {step === 1 && <BasicsStep initialData={draftData} onNext={handleNext} onDataChange={handleDataChange} setVenueId={setVenueId} />}
+                {step === 1 && <BasicsStep initialData={draftData} onNext={handleNext} onDataChange={handleDataChange} setVenueId={setSafeVenueId} />}
                 {step === 2 && venueId && <LocationStep initialData={draftData} venueId={venueId} onNext={handleNext} onDataChange={handleDataChange} onBack={handleBack} />}
                 {step === 3 && venueId && <DetailsStep initialData={draftData} venueId={venueId} onNext={handleNext} onDataChange={handleDataChange} onBack={handleBack} />}
                 {step === 4 && venueId && <MediaStep initialData={draftData} venueId={venueId} onNext={handleNext} onDataChange={handleDataChange} onBack={handleBack} />}

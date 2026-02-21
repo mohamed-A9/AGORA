@@ -30,9 +30,9 @@ export const ALL_ALLOWED_TYPES = [
 
 // File size limits (in bytes)
 export const FILE_SIZE_LIMITS = {
-    image: 10 * 1024 * 1024,      // 10MB
+    image: 10 * 1024 * 1024,      // 10MB (Cloudinary Free Limit)
     video: 100 * 1024 * 1024,     // 100MB
-    document: 20 * 1024 * 1024,   // 20MB
+    document: 30 * 1024 * 1024,   // 30MB (Allow bigger PDFs for compression)
 };
 
 // Dangerous file extensions that should NEVER be allowed

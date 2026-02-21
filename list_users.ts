@@ -1,13 +1,18 @@
+import { prisma } from "./lib/prisma";
 
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-
-async function run() {
-    const users = await prisma.user.findMany({
-        select: { id: true, email: true, name: true, role: true }
-    });
-    console.log("USERS IN DATABASE:");
-    console.table(users);
+async function main() {
+    try {
+        const users = await prisma.user.findMany({
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, name: true, email: true, role: true, createdAt: true }
+        });
+        console.log("Found users:", users.length);
+        console.table(users);
+    } catch (e) {
+        console.error(e);
+    } finally {
+        await prisma.$disconnect();
+    }
 }
 
-run().finally(() => prisma.$disconnect());
+main();

@@ -52,6 +52,8 @@ model User {
   preferredCities            String[]  @default([])
   preferredCategories        String[]  @default([])
   preferredAmbiances         String[]  @default([])
+  isOnboardingCompleted      Boolean   @default(false)
+  notifications              Notification[]
 }
 
 model Account {
@@ -134,7 +136,7 @@ model Venue {
   tiktokUrl           String?
   reservationsEnabled Boolean            @default(true)
   status              String             @default("APPROVED")
-  reservationPolicy   ReservationPolicy  @default(AGORA)
+  reservationPolicy   String[]           @default(["AGORA"])
   reservationPhoneNumber String?
   reservationUrl       String?
   facebookUrl         String?
@@ -147,6 +149,7 @@ model Venue {
   paymentMethods      String[]           @default([])
   parkingAvailable    Boolean            @default(false)
   valetParking        Boolean            @default(false)
+  rejectionReason     String?
   events              Event[]
   reviews             Review[]
   reservations        Reservation[]
@@ -414,9 +417,19 @@ enum MainCategory {
   WELLNESS_HEALTH
 }
 
-enum ReservationPolicy {
-  WALK_IN_ONLY
-  PHONE_WHATSAPP
-  EXTERNAL_LINK
-  AGORA
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  type      String   @default("INFO")
+  link      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
+
+// ReservationPolicy is now stored as String[] on the Venue model
+// Valid values: WALK_IN_ONLY, PHONE_WHATSAPP, EXTERNAL_LINK, AGORA

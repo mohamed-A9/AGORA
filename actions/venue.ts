@@ -68,6 +68,13 @@ export async function createVenueDraft(prevState: any, formData: FormData) {
             return { error: "Authentication Error: User ID missing. Please log out and log in again." };
         }
 
+        // Verify user exists to prevent Foreign Key errors (e.g. after DB reset)
+        const userExists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+        if (!userExists) {
+            fs.appendFileSync(logFile, `[${timestamp}] FAILED: User ${userId} not found in DB\n`);
+            return { error: "Session stale. User record not found. Please log out and log in again." };
+        }
+
         // ... rest of function
 
 
@@ -171,7 +178,7 @@ export async function updateVenueStep(venueId: string, data: any) {
 
         const existingVenue = await prisma.venue.findUnique({
             where: { id: venueId },
-            select: { id: true, ownerId: true, name: true, wizardStep: true }
+            select: { id: true, ownerId: true, name: true, wizardStep: true, status: true }
         });
 
         if (!existingVenue) {
@@ -199,6 +206,32 @@ export async function updateVenueStep(venueId: string, data: any) {
                 statusCode: 403
             };
         }
+
+        // ============================================
+        // STATUS CHECK (Lock content if Pending/Approved)
+        // ============================================
+        if (userRole !== "ADMIN") {
+            // Check if user is trying to change status (e.g. retract or launch)
+            // Note: updateData is prepared later, but we check raw data.status here for intent.
+            const isStatusChange = !!data.status;
+            const isRetracting = data.status === 'DRAFT';
+
+            if (existingVenue.status === 'PENDING_APPROVAL') {
+                if (!isRetracting) {
+                    return { error: "LOCKED", message: "Venue is pending approval. You cannot make changes.", statusCode: 403 };
+                }
+            }
+
+            if (existingVenue.status === 'APPROVED') {
+                // Approved venues are locked for structural edits until launched or reverted to draft
+                // Launching is handled by launchVenue action usually, but if updated here we allow status change.
+                if (!isStatusChange) {
+                    return { error: "LOCKED", message: "Venue is approved. Please launch it to go live.", statusCode: 403 };
+                }
+            }
+        }
+
+
 
         console.log(`✅ Ownership verified. Proceeding with update...`);
 
@@ -232,18 +265,26 @@ export async function updateVenueStep(venueId: string, data: any) {
         if (updateData.wizardStep) delete updateData.wizardStep; // Cleanup if it survived sanitization
 
         // Handle City Relation
-        if (updateData.city) {
-            const citySlug = updateData.city.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-            updateData.city = {
-                connectOrCreate: {
-                    where: { name: updateData.city },
-                    create: {
-                        name: updateData.city,
-                        slug: citySlug,
-                        country: "Morocco"
+        // `city` in schema is a relation (City model), NOT a plain string.
+        // We must use nested writes (connectOrCreate / disconnect).
+        if (updateData.city !== undefined) {
+            if (updateData.city && typeof updateData.city === 'string' && updateData.city.trim() !== '') {
+                const cityName = updateData.city.trim();
+                const citySlug = cityName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                updateData.city = {
+                    connectOrCreate: {
+                        where: { name: cityName },
+                        create: {
+                            name: cityName,
+                            slug: citySlug,
+                            country: "Morocco"
+                        }
                     }
-                }
-            };
+                };
+            } else {
+                // Empty string or falsy → disconnect the city relation
+                updateData.city = { disconnect: true };
+            }
         }
 
         // Category handling...
@@ -435,21 +476,15 @@ export async function updateVenueStep(venueId: string, data: any) {
 
         // 2. Handle Menu Items (Menu Images/PDFs)
         if (updateData.menus !== undefined) {
-            // We are updating the menus.
-            // Mark existing menu items for deletion
             deleteConditions.push({ kind: { in: ['menu_image', 'menu_pdf'] } });
 
             if (Array.isArray(updateData.menus) && updateData.menus.length > 0) {
                 updateData.menus.forEach((m: any, idx: number) => {
-                    // Map type to menu_kind
-                    // Frontend sends 'image' or 'pdf'. We map to 'menu_image' or 'menu_pdf'
-                    let kind = 'menu_image';
-                    if (m.type === 'pdf') kind = 'menu_pdf';
-                    else if (m.type === 'image') kind = 'menu_image';
-
+                    const kind = m.type === 'pdf' ? 'menu_pdf' : 'menu_image';
                     menuCreates.push({
                         url: m.url,
-                        kind: kind,
+                        thumbnailUrl: m.thumbnailUrl || null,
+                        kind,
                         sortOrder: idx
                     });
                 });
@@ -479,12 +514,19 @@ export async function updateVenueStep(venueId: string, data: any) {
             };
         }
 
-        // Handle Reservation Policy Logic
+        // Handle Reservation Policy Logic (now an array of strings)
         if (updateData.reservationPolicy) {
-            const policy = updateData.reservationPolicy;
-            // Sync legacy boolean
-            updateData.reservationsEnabled = (policy !== "WALK_IN_ONLY" && policy !== "NO_RESERVATION");
-            // Note: Enum in DB is WALK_IN_ONLY, but guarding against potential frontend string mismatch if any
+            let policies = updateData.reservationPolicy;
+            // Backward-compat: if frontend sends a single string, wrap it in an array
+            if (typeof policies === 'string') {
+                policies = [policies];
+                updateData.reservationPolicy = policies;
+            }
+            // Sync legacy boolean: enabled if any policy is not WALK_IN_ONLY
+            if (Array.isArray(policies)) {
+                updateData.reservationsEnabled = policies.length > 0 &&
+                    !(policies.length === 1 && policies[0] === "WALK_IN_ONLY");
+            }
         }
 
         // Cleanup UI-only fields that are not in Schema
@@ -515,6 +557,42 @@ export async function updateVenueStep(venueId: string, data: any) {
         console.log(`📊 WizardStep Update: Current=${existingVenue.wizardStep}, New=${wizardStep}`);
         fs.appendFileSync(logFile, `[${timestamp}] WizardStep: ${existingVenue.wizardStep} -> ${wizardStep}\n`);
 
+        // Phase 1: Delete existing relation entries that we're about to recreate
+        // This prevents unique constraint violations from concurrent deleteMany+create
+        const deleteOps: any[] = [];
+
+        if (updateData.cuisines && updateData.cuisines.create) {
+            deleteOps.push(prisma.venueCuisine.deleteMany({ where: { venueId } }));
+            // Remove deleteMany from the nested write, keep only create
+            delete updateData.cuisines.deleteMany;
+        }
+        if (updateData.vibes && updateData.vibes.create) {
+            deleteOps.push(prisma.venueVibe.deleteMany({ where: { venueId } }));
+            delete updateData.vibes.deleteMany;
+        }
+        if (updateData.musicTypes && updateData.musicTypes.create) {
+            deleteOps.push(prisma.venueMusicType.deleteMany({ where: { venueId } }));
+            delete updateData.musicTypes.deleteMany;
+        }
+        if (updateData.facilities && updateData.facilities.create) {
+            deleteOps.push(prisma.venueFacility.deleteMany({ where: { venueId } }));
+            delete updateData.facilities.deleteMany;
+        }
+        if (updateData.gallery && updateData.gallery.deleteMany) {
+            // Gallery uses a conditional deleteMany with OR conditions
+            deleteOps.push(prisma.venueMedia.deleteMany({
+                where: { venueId, ...updateData.gallery.deleteMany }
+            }));
+            delete updateData.gallery.deleteMany;
+        }
+
+        // Execute all deletes first (as a transaction for atomicity)
+        if (deleteOps.length > 0) {
+            console.log(`🗑️ Deleting ${deleteOps.length} relation sets before recreating...`);
+            await prisma.$transaction(deleteOps);
+        }
+
+        // Phase 2: Now do the update with only create operations (no conflicts)
         const updatedVenue = await prisma.venue.update({
             where: { id: venueId }, // Ownership already verified above
             data: {
@@ -753,3 +831,40 @@ export async function deleteVenue(venueId: string) {
         return { error: `Delete failed: ${e.message}` };
     }
 }
+
+export async function launchVenue(venueId: string) {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) return { error: "Unauthorized" };
+
+    const userId = (session.user as any).id as string;
+
+    // Check venue status
+    const venue = await prisma.venue.findUnique({
+        where: { id: venueId },
+        select: { id: true, ownerId: true, status: true, isActive: true }
+    });
+
+    if (!venue) return { error: "Venue not found" };
+    if (venue.ownerId !== userId) return { error: "Permission denied" };
+
+    // Check if approved
+    if (venue.status !== 'APPROVED') {
+        return { error: "Venue must be approved before launching." };
+    }
+
+    // Update to LIVE
+    await prisma.venue.update({
+        where: { id: venueId },
+        data: {
+            status: "LIVE",
+            isActive: true,
+            isVerified: true // Auto-verify on launch if approved
+        }
+    });
+
+    revalidatePath("/business/dashboard");
+    revalidatePath(`/venue/${venue.id}`);
+    return { success: true };
+}
+
+

@@ -80,6 +80,8 @@ export async function updateVenue(formData: FormData) {
     // @ts-ignore
     if (!venue || (venue.ownerId !== session.user.id && role !== "ADMIN")) return { error: "Forbidden" };
 
+    if (venue.status === 'PENDING' && role !== "ADMIN") return { error: "Venue is under review and cannot be modified." };
+
     try {
         // Prepare relational data slugs
         const subcategorySlug = data.subcategory?.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -205,5 +207,34 @@ export async function deleteVenue(id: string) {
         return { success: true };
     } catch (e) {
         return { error: "Delete failed" };
+    }
+}
+
+export async function updateVenueStatus(venueId: string, status: string) {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) return { error: "Unauthorized" };
+
+    const venue = await prisma.venue.findUnique({ where: { id: venueId } });
+
+    // Fetch fresh role
+    const dbUser = await prisma.user.findUnique({
+        where: { id: (session.user as any).id },
+        select: { role: true }
+    });
+    const role = dbUser?.role || "USER";
+
+    // @ts-ignore
+    if (!venue || (venue.ownerId !== session.user.id && role !== "ADMIN")) return { error: "Forbidden" };
+
+    try {
+        await prisma.venue.update({
+            where: { id: venueId },
+            data: { status }
+        });
+        revalidatePath("/business/my-venues");
+        return { success: true };
+    } catch (e) {
+        console.error(e);
+        return { error: "Status update failed" };
     }
 }

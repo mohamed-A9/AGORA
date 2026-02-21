@@ -88,6 +88,7 @@ export const authOptions: NextAuthOptions = {
             password: true,
             role: true,
             emailVerified: true,
+            isOnboardingCompleted: true,
           },
         });
 
@@ -101,9 +102,11 @@ export const authOptions: NextAuthOptions = {
 
         // Password check
         const ok = await bcrypt.compare(password, user.password);
+        console.log(`🔐 Login Debug: Email=${email}, PwdCheck=${ok}, Verified=${user.emailVerified}`);
+
         if (!ok) return null;
 
-        // Email verification enforcement (optional for credentials, strictly speaking)
+        // Force disable verification check for now
         // if (!user.emailVerified) throw new Error("EMAIL_NOT_VERIFIED");
 
         return {
@@ -111,6 +114,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role, // USER | BUSINESS | ADMIN
+          isOnboardingCompleted: user.isOnboardingCompleted,
         } as any;
       },
     }),
@@ -133,6 +137,7 @@ export const authOptions: NextAuthOptions = {
       const allCookies = cookieStore.getAll();
       const loginRole = cookieStore.get("login-role")?.value;
       const signupRole = cookieStore.get("signup-role")?.value;
+      const authIntent = cookieStore.get("auth_intent")?.value;
       const intendedRole = loginRole || signupRole;
 
       console.log('🔐 SignIn Callback Debug:', {
@@ -141,12 +146,16 @@ export const authOptions: NextAuthOptions = {
         loginRole,
         signupRole,
         intendedRole,
+        authIntent,
         allCookies: allCookies.map(c => ({ name: c.name, value: c.value })),
         provider: account?.provider
       });
 
       // 3. If user exists, enforce role match
       if (existingUser) {
+        // Ensure the user object passed to JWT has the up-to-date role from DB
+        (user as any).role = existingUser.role;
+
         if (intendedRole && existingUser.role !== intendedRole) {
           console.log('⚠️ Role mismatch detected but allowing login:', {
             existingRole: existingUser.role,
@@ -154,21 +163,54 @@ export const authOptions: NextAuthOptions = {
             email
           });
           // We allow the login. The session will use the existingUser.role.
-          // This fixes the issue where a Business user trying to "Login" (defaulting to USER role in UI) gets blocked.
         }
+        return true;
       }
 
-      // 4. If user does NOT exist (new signup), let it proceed.
-      console.log('✅ Sign-in allowed for:', email);
+      // 4. If user does NOT exist (new signup)
+      // Strict Check: If intent was 'login', DO NOT create account.
+      if (authIntent === "login") {
+        console.log("🛑 Login attempt for non-existent user rejected:", email);
+        return "/signup?error=AccountNotFound";
+      }
+
+      console.log('✅ Sign-up allowed for:', email);
       return true;
     },
 
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger, session }) {
       // On login, persist custom fields into JWT
       if (user) {
         token.role = (user as any).role;
         token.uid = (user as any).id;
+        token.isOnboardingCompleted = (user as any).isOnboardingCompleted;
+        token.emailVerified = (user as any).emailVerified;
       }
+
+      // Handle Session Update (Refetch from DB) to refresh token
+      if (trigger === "update") {
+        console.log("JWT Update Triggered. Token ID:", token.uid || token.sub);
+        const userId = (token.uid as string) || (token.sub as string);
+
+        if (userId) {
+          try {
+            const freshUser = await prisma.user.findUnique({
+              where: { id: userId }
+            });
+            if (freshUser) {
+              console.log("Refreshed User Data. Onboarding:", freshUser.isOnboardingCompleted);
+              token.isOnboardingCompleted = freshUser.isOnboardingCompleted;
+              token.emailVerified = freshUser.emailVerified;
+              token.role = freshUser.role;
+              token.name = freshUser.name;
+              token.email = freshUser.email;
+            }
+          } catch (error) {
+            console.error("Error refreshing user in JWT:", error);
+          }
+        }
+      }
+
       return token;
     },
 
@@ -177,6 +219,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.uid;
         (session.user as any).role = token.role;
+        (session.user as any).isOnboardingCompleted = token.isOnboardingCompleted;
+        (session.user as any).emailVerified = token.emailVerified;
       }
       return session;
     },

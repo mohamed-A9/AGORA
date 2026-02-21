@@ -158,7 +158,7 @@ export default function FilterSidebar({ filters, setFilters, className = "", onC
                             onChange={(e) => update("city", e.target.value)}
                             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 appearance-none"
                         >
-                            <option value="" disabled>Select a city</option>
+                            <option value="All Cities">All Cities</option>
                             {moroccanCities.map(c => (
                                 <option key={c} value={c} className="bg-zinc-900">{c}</option>
                             ))}

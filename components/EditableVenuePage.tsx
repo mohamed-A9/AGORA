@@ -9,6 +9,7 @@ import {
     CalendarDays, MessageCircle, Map, Mail, FileText, Zap
 } from "lucide-react";
 import MediaUpload from "@/components/MediaUpload";
+import MenuUpload from "@/components/MenuUpload";
 import FloorPlanEditor, { Scene } from "@/components/venue-wizard/FloorPlanEditor";
 import { createVenueDraft, updateVenueStep } from "@/actions/venue";
 import { TAXONOMY } from "@/lib/taxonomy";
@@ -91,12 +92,15 @@ export default function VenueWizardPage() {
 
 
     // Persistence: Save ID & Step (write-only, for session continuity)
+
     useEffect(() => {
         if (venueId) {
             localStorage.setItem("agora_last_venue_id", venueId);
             localStorage.setItem(`agora_editor_step_${venueId}`, currentStep.toString());
         }
     }, [venueId, currentStep]);
+
+
 
     // Hydrate form if editing existing draft (ONLY when resuming from URL)
     useEffect(() => {
@@ -190,7 +194,9 @@ export default function VenueWizardPage() {
                     parkingAvailable: v.parkingAvailable,
                     valetParking: v.valetParking,
                     reservationsEnabled: v.reservationsEnabled,
-                    reservationPolicy: v.reservationPolicy || "AGORA",
+                    reservationPolicy: Array.isArray(v.reservationPolicy)
+                        ? v.reservationPolicy
+                        : (v.reservationPolicy ? [v.reservationPolicy] : ["AGORA"]),
                     reservationPhoneNumber: v.reservationPhoneNumber || "",
                     reservationUrl: v.reservationUrl || "",
                     menuUrl: v.menuUrl || "",
@@ -265,7 +271,7 @@ export default function VenueWizardPage() {
         parkingAvailable: false,
         valetParking: false,
         reservationsEnabled: true,
-        reservationPolicy: "AGORA",
+        reservationPolicy: ["AGORA"] as string[],
         reservationPhoneNumber: "+212 ",
         reservationUrl: "",
         menuUrl: "",
@@ -398,6 +404,18 @@ export default function VenueWizardPage() {
         setIsDirty(true);
     };
 
+    // Autosave Hook - Moved here to access initialized state
+    useEffect(() => {
+        if (!isDirty || !data.name || !data.category) return;
+
+        const timer = setTimeout(() => {
+            console.log("💾 Autosave triggering...");
+            handleSaveStep(undefined, true);
+        }, 3000);
+
+        return () => clearTimeout(timer);
+    }, [isDirty, data, scheduleRows, gallery, menuGallery, selectedCuisines, selectedVibes, selectedMusic, selectedFacilities, selectedPayments, floorPlanScenes]);
+
     // --- Helpers ---
 
     // 1. Select File -> Open Cropper
@@ -462,18 +480,28 @@ export default function VenueWizardPage() {
         return result.secure_url;
     }
 
-    async function handleSaveStep(nextStep?: number) {
-        setSaving(true);
+    async function handleSaveStep(nextStep?: number, isAutosave = false) {
+        // Guard: Skip if a save is already in progress (prevents concurrent saves)
+        if (isSavingRef.current) {
+            if (isAutosave) {
+                console.log("⏸️ Skipping autosave — save already in progress");
+                return;
+            }
+            // For manual saves, also skip to prevent double-submit
+            console.log("⏸️ Skipping manual save — save already in progress");
+            return;
+        }
+        if (!isAutosave) setSaving(true);
         isSavingRef.current = true;
 
-        // MANDATORY VALIDATION - ALWAYS RUNS (BUT ONLY WHEN MOVING FORWARD)
+        // MANDATORY VALIDATION - ALWAYS RUNS (BUT ONLY WHEN MOVING FORWARD AND NOT AUTOSAVE)
         // User cannot proceed until all required fields IF moving forward.
         // Moving backward is allowed to review previous steps.
         // ============================================
 
         const isMovingForward = nextStep === undefined || nextStep > currentStep;
 
-        if (isMovingForward) {
+        if (!isAutosave && isMovingForward) {
             // Step 1: Validation (Mandatory Fields)
             if (currentStep === 1) {
                 const missingFields = [];
@@ -585,12 +613,12 @@ export default function VenueWizardPage() {
                 if (!selectedPayments || selectedPayments.length === 0) step4Errors.push("At least one Payment Method is required");
 
                 // 2. Conditional Reservation Fields
-                if (data.reservationPolicy === 'PHONE_WHATSAPP') {
+                if (data.reservationPolicy.includes('PHONE_WHATSAPP')) {
                     if (!data.reservationPhoneNumber || data.reservationPhoneNumber.length < 5) {
                         step4Errors.push("Phone Number is required for Phone/WhatsApp bookings");
                     }
                 }
-                if (data.reservationPolicy === 'EXTERNAL_LINK') {
+                if (data.reservationPolicy.includes('EXTERNAL_LINK')) {
                     if (!data.reservationUrl || data.reservationUrl.length < 5) { // Basic length check
                         step4Errors.push("Booking URL is required for External Website bookings");
                     }
@@ -618,6 +646,8 @@ export default function VenueWizardPage() {
                 router.push(`/business/dashboard?success=venue-created`);
             } else {
                 setCurrentStep(nextStep);
+                // Also update completedStep when skipping save
+                setCompletedStep(prev => Math.max(prev, currentStep));
             }
             setSaving(false);
             isSavingRef.current = false;
@@ -690,7 +720,10 @@ export default function VenueWizardPage() {
                 scenes: currentScenes
             },
             // Send next step as the new wizard step (backend will ensure it only increases)
-            wizardStep: nextStep ? nextStep : undefined
+            wizardStep: nextStep ? nextStep : undefined,
+
+            // If finishing, mark as PENDING_APPROVAL
+            ...((nextStep && nextStep > TOTAL_STEPS) ? { status: 'PENDING_APPROVAL' } : {})
         };
 
         // DEBUG: Log what we're sending
@@ -698,6 +731,8 @@ export default function VenueWizardPage() {
 
         try {
             let currentId = venueId;
+            let saveResult: any = null;
+
             if (!currentId) {
                 // Determine if we need to create first
                 if (data.name && data.category) {
@@ -710,7 +745,7 @@ export default function VenueWizardPage() {
                         currentId = res.venueId;
 
                         // 1. Save Data IMMEDIATELY (Before any nav)
-                        await updateVenueStep(res.venueId, submitData);
+                        saveResult = await updateVenueStep(res.venueId, submitData);
 
                         // NOTE: We intentionally do NOT update the URL here
                         // Updating the URL triggers useSearchParams to re-evaluate,
@@ -719,7 +754,21 @@ export default function VenueWizardPage() {
                     }
                 }
             } else {
-                await updateVenueStep(currentId, submitData);
+                saveResult = await updateVenueStep(currentId, submitData);
+            }
+
+            // CHECK: Did the server action return an error?
+            if (saveResult?.error) {
+                console.error("❌ Save returned error:", saveResult.error, saveResult.message);
+                if (!isAutosave) {
+                    showNotification(
+                        "Save Failed",
+                        saveResult.message || saveResult.error || "Failed to save venue data.",
+                        "error"
+                    );
+                }
+                // Do NOT advance the step — save failed!
+                return;
             }
 
             if (nextStep) {
@@ -728,16 +777,14 @@ export default function VenueWizardPage() {
                 } else {
                     setCurrentStep(nextStep);
                     // Update completed step to be the one we just finished
-                    if (currentStep > completedStep) {
-                        setCompletedStep(currentStep);
-                    }
+                    setCompletedStep(prev => Math.max(prev, currentStep));
                 }
             }
         } catch (error) {
             console.error("Save error:", error);
-            showNotification("Save Failed", "Failed to save. Please try again.", "error");
+            if (!isAutosave) showNotification("Save Failed", "Failed to save. Please try again.", "error");
         } finally {
-            setSaving(false);
+            if (!isAutosave) setSaving(false);
             isSavingRef.current = false;
             setIsDirty(false);
         }
@@ -764,12 +811,77 @@ export default function VenueWizardPage() {
             />
 
 
-            {/* Top Bar Removed as requested - Progress is now in the bottom bar */}
+            {/* TOP NAVIGATION BAR (Desktop Only) */}
+            <div className="hidden md:flex sticky top-0 z-50 w-full bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800 p-4 items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => router.push('/business/my-venues')}
+                        className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
+                    >
+                        <ChevronLeft size={20} />
+                        <span className="font-bold text-sm">Exit</span>
+                    </button>
 
-            {/* DEBUG BANNER - Remove after testing */}
-            <div className="bg-yellow-500/20 border-b border-yellow-500 p-2 text-center text-xs font-mono">
-                DEBUG: currentStep={currentStep} | completedStep={completedStep} | venueId={venueId}
+                    <div className="h-6 w-px bg-zinc-800 mx-2"></div>
+                    <span className="text-zinc-500 text-xs font-mono">
+                        Step {currentStep} of {TOTAL_STEPS} {saving && <span className="text-indigo-400 animate-pulse ml-2">Saving...</span>}
+                    </span>
+
+                    <button
+                        onClick={() => handleSaveStep(undefined)}
+                        disabled={saving || !isDirty}
+                        className="p-2 text-indigo-400 hover:text-indigo-300 disabled:opacity-30 transition-colors"
+                        title="Save Draft"
+                    >
+                        <Save size={18} />
+                    </button>
+                </div>
+
+                {/* Centered Steps */}
+                <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((step) => (
+                        <button
+                            key={step}
+                            onClick={() => {
+                                if (venueId) handleSaveStep(step);
+                            }}
+                            disabled={!venueId}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all
+                                ${currentStep === step
+                                    ? 'bg-white text-black scale-110 shadow-lg'
+                                    : step <= completedStep
+                                        ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                                        : 'bg-zinc-800 text-zinc-600 hover:bg-zinc-700'
+                                }
+                            `}
+                        >
+                            {step <= completedStep ? <Check size={14} strokeWidth={3} /> : step}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="flex items-center gap-4">
+                    {/* Next Button */}
+                    <button
+                        onClick={() => handleSaveStep(currentStep + 1)}
+                        disabled={saving}
+                        className="px-6 py-2.5 rounded-full bg-white text-black font-bold text-sm shadow-lg shadow-white/10 hover:bg-indigo-50 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                        {saving ? 'Saving...' : (currentStep === TOTAL_STEPS ? 'Finish' : 'Next')}
+                        {!saving && <ArrowRight size={16} />}
+                    </button>
+                </div>
+
+                {/* Completion Line (Absolute Bottom of Bar) */}
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-zinc-800">
+                    <div
+                        className="h-full bg-emerald-500 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                        style={{ width: `${(Math.max(completedStep, currentStep - 1) / TOTAL_STEPS) * 100}%` }}
+                    />
+                </div>
             </div>
+
+
 
             {/* Main Content */}
             <div className={`flex-1 w-full mx-auto p-4 md:p-6 pb-20 transition-all duration-500 ${currentStep === 5 ? 'max-w-[95%]' : 'max-w-4xl'}`}>
@@ -1236,11 +1348,11 @@ export default function VenueWizardPage() {
                                 <FileText className="w-5 h-5 text-yellow-400" />
                                 Menu (Optional)
                             </h3>
-                            <MediaUpload
+                            <MenuUpload
                                 initialMedia={menuGallery}
                                 onChange={setMenuGallery}
                                 maxFiles={5}
-                                allowedFormats={['image', 'pdf']}
+                                venueId={venueId || ""}
                             />
                         </div>
                     </div>
@@ -1436,71 +1548,105 @@ export default function VenueWizardPage() {
 
                             {/* Booking Configuration */}
                             <div>
-                                <label className="block text-xs uppercase font-bold text-zinc-500 mb-4">Reservations</label>
-                                <div className="bg-zinc-800 rounded-xl overflow-hidden p-1 flex mb-6">
+                                <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Reservation Methods</label>
+                                <p className="text-xs text-zinc-600 mb-4">Select one or more ways customers can book with you.</p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
                                     {[
-                                        { id: 'AGORA', label: 'Use Agora System', icon: Sparkles },
-                                        { id: 'PHONE_WHATSAPP', label: 'Phone / WhatsApp', icon: Phone },
-                                        { id: 'EXTERNAL_LINK', label: 'External Website', icon: LinkIcon },
-                                    ].map(type => (
-                                        <button
-                                            key={type.id}
-                                            onClick={() => updateField("reservationPolicy", type.id)}
-                                            className={`flex-1 flex gap-2 items-center justify-center py-3 rounded-lg text-sm font-bold transition-all ${data.reservationPolicy === type.id
-                                                ? 'bg-indigo-600 text-white shadow-lg'
-                                                : 'hover:bg-zinc-700 text-zinc-400'
-                                                }`}
-                                        >
-                                            <type.icon className="w-4 h-4" />
-                                            {type.label}
-                                        </button>
-                                    ))}
+                                        {
+                                            id: 'AGORA', label: 'Agora System', desc: 'Smart booking via dashboard', icon: Sparkles,
+                                            selectedBg: 'bg-indigo-500/15', selectedBorder: 'border-indigo-500/50', iconBg: 'bg-indigo-500/20', iconColor: 'text-indigo-400'
+                                        },
+                                        {
+                                            id: 'PHONE_WHATSAPP', label: 'Phone / WhatsApp', desc: 'Direct call or message', icon: Phone,
+                                            selectedBg: 'bg-green-500/15', selectedBorder: 'border-green-500/50', iconBg: 'bg-green-500/20', iconColor: 'text-green-400'
+                                        },
+                                        {
+                                            id: 'EXTERNAL_LINK', label: 'External Website', desc: 'Redirect to your link', icon: LinkIcon,
+                                            selectedBg: 'bg-blue-500/15', selectedBorder: 'border-blue-500/50', iconBg: 'bg-blue-500/20', iconColor: 'text-blue-400'
+                                        },
+                                    ].map(type => {
+                                        const isSelected = data.reservationPolicy.includes(type.id);
+                                        return (
+                                            <button
+                                                key={type.id}
+                                                onClick={() => {
+                                                    const current = data.reservationPolicy;
+                                                    let updated: string[];
+                                                    if (isSelected) {
+                                                        // Don't allow removing the last one
+                                                        if (current.length <= 1) return;
+                                                        updated = current.filter((p: string) => p !== type.id);
+                                                    } else {
+                                                        updated = [...current, type.id];
+                                                    }
+                                                    updateField("reservationPolicy", updated);
+                                                }}
+                                                className={`relative flex flex-col items-center gap-2 p-4 rounded-xl text-sm font-bold transition-all border-2 ${isSelected
+                                                    ? `${type.selectedBg} ${type.selectedBorder} text-white shadow-lg`
+                                                    : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:border-zinc-600'
+                                                    }`}
+                                            >
+                                                {isSelected && (
+                                                    <div className="absolute top-2 right-2">
+                                                        <Check size={14} className="text-emerald-400" />
+                                                    </div>
+                                                )}
+                                                <div className={`p-2 rounded-full ${isSelected ? type.iconBg : 'bg-zinc-700/50'}`}>
+                                                    <type.icon className={`w-5 h-5 ${isSelected ? type.iconColor : 'text-zinc-500'}`} />
+                                                </div>
+                                                <span>{type.label}</span>
+                                                <span className={`text-[10px] font-normal ${isSelected ? 'text-zinc-300' : 'text-zinc-600'}`}>{type.desc}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
 
-                                {/* Conditional Config */}
-                                {data.reservationPolicy === 'AGORA' && (
-                                    <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 flex items-start gap-4">
-                                        <div className="p-2 bg-indigo-500/20 rounded-full">
-                                            <Sparkles className="w-5 h-5 text-indigo-400" />
+                                {/* Conditional Config Sections */}
+                                <div className="space-y-4">
+                                    {data.reservationPolicy.includes('AGORA') && (
+                                        <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 flex items-start gap-4 animate-in fade-in slide-in-from-top-2">
+                                            <div className="p-2 bg-indigo-500/20 rounded-full">
+                                                <Sparkles className="w-5 h-5 text-indigo-400" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-white font-bold text-sm mb-1">Smart Reservations</h4>
+                                                <p className="text-zinc-400 text-xs">Agora will handle your bookings. You'll get notified in the dashboard and can manage tables, customer logs, and deposits automatically.</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h4 className="text-white font-bold text-sm mb-1">Smart Reservations</h4>
-                                            <p className="text-zinc-400 text-xs">Agora will handle your bookings. You'll get notified in the dashboard and can manage tables, customer logs, and deposits automatically.</p>
-                                        </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {data.reservationPolicy === 'PHONE_WHATSAPP' && (
-                                    <div className="animate-in fade-in slide-in-from-top-2">
-                                        <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Booking Phone Number</label>
-                                        <div className="flex items-center gap-2 bg-zinc-900 rounded-lg px-3 py-2 border border-zinc-700 focus-within:border-indigo-500">
-                                            <Phone className="w-5 h-5 text-green-400" />
-                                            <input
-                                                type="text"
-                                                placeholder="06..."
-                                                value={data.reservationPhoneNumber}
-                                                onChange={e => updateField("reservationPhoneNumber", e.target.value)}
-                                                className="w-full bg-transparent border-none text-sm outline-none"
-                                            />
+                                    {data.reservationPolicy.includes('PHONE_WHATSAPP') && (
+                                        <div className="animate-in fade-in slide-in-from-top-2">
+                                            <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Booking Phone Number</label>
+                                            <div className="flex items-center gap-2 bg-zinc-900 rounded-lg px-3 py-2 border border-zinc-700 focus-within:border-indigo-500">
+                                                <Phone className="w-5 h-5 text-green-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="06..."
+                                                    value={data.reservationPhoneNumber}
+                                                    onChange={e => updateField("reservationPhoneNumber", e.target.value)}
+                                                    className="w-full bg-transparent border-none text-sm outline-none"
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {data.reservationPolicy === 'EXTERNAL_LINK' && (
-                                    <div className="animate-in fade-in slide-in-from-top-2">
-                                        <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Booking URL</label>
-                                        <div className="flex items-center gap-2 bg-zinc-900 rounded-lg px-3 py-2 border border-zinc-700 focus-within:border-indigo-500">
-                                            <LinkIcon className="w-5 h-5 text-blue-400" />
-                                            <input
-                                                type="url"
-                                                placeholder="https://sevenrooms.com/..."
-                                                value={data.reservationUrl}
-                                                onChange={e => updateField("reservationUrl", e.target.value)}
-                                                className="w-full bg-transparent border-none text-sm outline-none"
-                                            />
+                                    {data.reservationPolicy.includes('EXTERNAL_LINK') && (
+                                        <div className="animate-in fade-in slide-in-from-top-2">
+                                            <label className="block text-xs uppercase font-bold text-zinc-500 mb-2">Booking URL</label>
+                                            <div className="flex items-center gap-2 bg-zinc-900 rounded-lg px-3 py-2 border border-zinc-700 focus-within:border-indigo-500">
+                                                <LinkIcon className="w-5 h-5 text-blue-400" />
+                                                <input
+                                                    type="url"
+                                                    placeholder="https://sevenrooms.com/..."
+                                                    value={data.reservationUrl}
+                                                    onChange={e => updateField("reservationUrl", e.target.value)}
+                                                    className="w-full bg-transparent border-none text-sm outline-none"
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
 
 
@@ -1574,8 +1720,8 @@ export default function VenueWizardPage() {
                 />
             )}
 
-            {/* Bottom Navigation Bar - Global (Visible on all screens) */}
-            <div className="fixed bottom-0 left-0 w-full bg-zinc-900/90 backdrop-blur-xl border-t border-zinc-800 p-4 z-50 flex items-center justify-between safe-area-pb">
+            {/* Bottom Navigation Bar - Mobile Only */}
+            <div className="md:hidden fixed bottom-0 left-0 w-full bg-zinc-900/90 backdrop-blur-xl border-t border-zinc-800 p-4 z-50 flex items-center justify-between safe-area-pb">
                 <button
                     onClick={() => currentStep > 1 ? setCurrentStep(currentStep - 1) : router.back()}
                     className="px-6 py-3 rounded-xl bg-zinc-800 text-white font-bold text-sm active:scale-95 transition-transform hover:bg-zinc-700 scale-95 origin-left"

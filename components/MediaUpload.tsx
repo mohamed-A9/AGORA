@@ -1,8 +1,7 @@
 "use client";
 
-import { CldUploadWidget } from "next-cloudinary";
-import { Upload, ChevronLeft, ChevronRight, Trash2, FileText, Pencil, Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Upload, ChevronLeft, ChevronRight, Trash2, FileText, Pencil, Loader2, ExternalLink } from "lucide-react";
+import { useState, useEffect, useId, useRef } from "react";
 import ImageCropper from "./ImageCropper";
 import VideoEditor, { VideoTransformations } from "./VideoEditor";
 import Toast from "./Toast";
@@ -12,6 +11,36 @@ import {
     ALLOWED_VIDEO_TYPES,
     ALLOWED_DOCUMENT_TYPES
 } from "@/lib/file-validation";
+
+// Dynamic imports for heavy libraries
+let PDFLib: any = null;
+let pdfjsLib: any = null;
+
+const loadPdfLibs = async () => {
+    if (PDFLib && pdfjsLib) return { PDFLib, pdfjsLib };
+
+    try {
+        console.log("📂 Loading heavy PDF libraries...");
+        const [pdfLibMod, pdfjsMod] = await Promise.all([
+            import('pdf-lib'),
+            import('pdfjs-dist')
+        ]);
+
+        PDFLib = pdfLibMod;
+        pdfjsLib = pdfjsMod;
+
+        // For PDF.js 5.x, the worker MUST be a module (.mjs) when using the ESM build
+        // jsDelivr is usually more reliable than cdnjs for recent ESM modules
+        const version = pdfjsLib.version || '5.4.624';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.mjs`;
+
+        console.log(`✅ PDF libraries loaded (v${version})`);
+        return { PDFLib, pdfjsLib };
+    } catch (error) {
+        console.error("❌ Failed to load PDF libraries:", error);
+        throw error;
+    }
+};
 
 interface MediaItem {
     id?: string;
@@ -26,6 +55,8 @@ interface MediaUploadProps {
     maxFiles?: number;
     title?: string;
     description?: string;
+    disableEditing?: boolean;
+    convertPdfToImages?: boolean;
 }
 
 type AwsAllowedFormats = "image" | "video" | "pdf";
@@ -36,8 +67,12 @@ export default function MediaUpload({
     allowedFormats = ["image", "video", "pdf"],
     maxFiles = 10,
     title = "Upload Media",
-    description = "Images, Videos, or PDF Menus"
+    description = "Images, Videos, or PDF Menus",
+    disableEditing = false,
+    convertPdfToImages = false
 }: MediaUploadProps) {
+    const inputId = useId();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const items = initialMedia;
     const [croppingItemIndex, setCroppingItemIndex] = useState<number | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -51,7 +86,14 @@ export default function MediaUpload({
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
+
+        console.log(`📂 Files selected in ${title}:`, files.length);
         await uploadFiles(Array.from(files));
+
+        // Reset input value to allow selecting the same file again
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
     };
 
     const handleDrop = async (e: React.DragEvent) => {
@@ -91,6 +133,7 @@ export default function MediaUpload({
         }
 
         const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dt5sqovt9";
+        const apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY || "853549478416266";
         setIsUploading(true);
 
         const newPending = validFiles.map(file => ({
@@ -114,51 +157,119 @@ export default function MediaUpload({
                 }
             }
 
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("upload_preset", "agora_uploads");
-            formData.append("folder", "venues");
-
-            try {
-                const response = await fetch(
-                    `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
-                    {
-                        method: "POST",
-                        body: formData,
+            // PDF Handling: Either Convert to Images OR Compress
+            if (file.type === 'application/pdf') {
+                if (convertPdfToImages) {
+                    try {
+                        showToast("Converting PDF to images...", "info");
+                        const images = await convertPdfToImageFiles(file);
+                        // Process the newly created images
+                        for (const imgFile of images) {
+                            await uploadSingleFile(imgFile, cloudName, apiKey, currentItems, (newItems) => {
+                                currentItems = newItems;
+                                onChange(currentItems);
+                            });
+                        }
+                        // Remove pending for the PDF since it's replaced by images
+                        setPendingFiles(prev => prev.filter(p => p.id !== pending.id));
+                        continue; // Skip the individual PDF upload
+                    } catch (e) {
+                        console.error("PDF Conversion failed", e);
                     }
-                );
-
-                const data = await response.json();
-
-                if (response.ok && data.secure_url) {
-                    let type: AwsAllowedFormats = "image";
-                    if (data.resource_type === "video") type = "video";
-                    if (data.format === "pdf") type = "pdf";
-
-                    const newItem: MediaItem = {
-                        url: data.secure_url,
-                        type
-                    };
-
-                    currentItems = [...currentItems, newItem];
-                    onChange(currentItems);
-                } else {
-                    const errorMsg = data.error?.message || "Upload failed. Check your Cloudinary settings.";
-                    console.error("Cloudinary Error:", data);
-                    showToast(`Error uploading ${file.name}: ${errorMsg}`, "error");
+                } else if (file.size > 10 * 1024 * 1024) {
+                    try {
+                        showToast("Optimizing large PDF...", "info");
+                        file = await compressPdf(file);
+                    } catch (e) {
+                        console.error("PDF Optimization failed, trying original", e);
+                    }
                 }
-            } catch (error) {
-                console.error("Upload error:", error);
-                showToast(`Network error uploading ${file.name}`, "error");
-            } finally {
-                setPendingFiles(prev => prev.filter(p => p.id !== pending.id));
-                if (pending.preview) URL.revokeObjectURL(pending.preview);
             }
+
+            // Normal individual file upload
+            await uploadSingleFile(file, cloudName, apiKey, currentItems, (newItems) => {
+                currentItems = newItems;
+                onChange(currentItems);
+            }, pending);
         }
 
         setIsUploading(false);
         if (currentItems.length > items.length) {
             showToast(`Successfully uploaded ${currentItems.length - items.length} file(s)!`, "success");
+        }
+    };
+
+    const uploadSingleFile = async (
+        file: File,
+        cloudName: string,
+        apiKey: string,
+        currentItems: MediaItem[],
+        onUpdate: (items: MediaItem[]) => void,
+        pending?: any
+    ) => {
+        try {
+            const timestamp = Math.round((new Date).getTime() / 1000);
+            const paramsToSign = {
+                folder: "venues",
+                timestamp: timestamp,
+                access_mode: "public"  // Ensure the uploaded asset is publicly accessible
+            };
+
+            const signResponse = await fetch('/api/sign-cloudinary', {
+                method: 'POST',
+                body: JSON.stringify({ paramsToSign }),
+            });
+
+            if (!signResponse.ok) throw new Error("Failed to get upload signature");
+
+            const { signature } = await signResponse.json();
+
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("api_key", apiKey);
+            formData.append("timestamp", timestamp.toString());
+            formData.append("signature", signature);
+            formData.append("folder", "venues");
+            formData.append("access_mode", "public"); // Must also be in formData
+
+            const response = await fetch(
+                `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
+                { method: "POST", body: formData }
+            );
+
+            const data = await response.json();
+
+            if (response.ok && data.secure_url) {
+                let type: AwsAllowedFormats = "image";
+                if (data.resource_type === "video") type = "video";
+                if (data.format === "pdf") type = "pdf";
+
+                // Build a consistent, clean public URL from the response
+                const outCloudName = data.cloud_name || 'dt5sqovt9';
+                const resourceType = data.resource_type || 'image';
+                const publicId = data.public_id;  // e.g. "venues/abc123"
+                const version = data.version ? `v${data.version}/` : '';
+                const format = data.format || 'jpg';
+                const publicUrl = `https://res.cloudinary.com/${outCloudName}/${resourceType}/upload/${version}${publicId}.${format}`;
+
+                const newItem: MediaItem = {
+                    url: publicUrl,
+                    type
+                };
+
+                onUpdate([...currentItems, newItem]);
+            } else {
+                console.error("Upload Error:", data);
+                showToast(`Error uploading ${file.name}: ${data.error?.message || 'Unknown error'}`, "error");
+            }
+        } catch (error: any) {
+            console.error("Upload error:", error);
+            showToast(`Upload failed: ${error.message}`, "error");
+        } finally {
+            if (pending) {
+                setPendingFiles(prev => prev.filter(p => p.id !== pending.id));
+                if (pending.preview) URL.revokeObjectURL(pending.preview);
+            }
         }
     };
 
@@ -209,6 +320,29 @@ export default function MediaUpload({
         return url;
     };
 
+    const getPublicCloudinaryUrl = (url: string) => {
+        // res.cloudinary.com is the correct public CDN endpoint when access_mode=public.
+        // No transformation needed — the 401 was caused by missing access_mode in the signed upload.
+        return url;
+    };
+
+    const getPdfThumbnail = (url: string) => {
+        if (!url || !url.includes('cloudinary.com')) return null;
+        // Normalize away res. subdomain first
+        const normalUrl = url.replace('res.cloudinary.com', 'cloudinary.com');
+        // Cloudinary trick: render first page as JPEG image
+        return normalUrl
+            .replace(/\/upload\/(?:v\d+\/)?/, (match) => `${match}f_jpg,pg_1,w_1000,c_limit/`)
+            .replace(/\.pdf$/, '.jpg');
+    };
+
+    const handleViewPdf = (url: string) => {
+        // Just open the PDF directly - access_mode is now public so no auth is needed.
+        // fl_inline was causing a 400 error for raw-type PDFs.
+        // If URL uses /image/upload/ but the file is raw, try /raw/upload/ as fallback.
+        window.open(url, '_blank', 'noopener,noreferrer');
+    };
+
     const handleVideoSave = (transforms: VideoTransformations) => {
         if (croppingItemIndex === null) return;
         const newItems = [...items];
@@ -216,31 +350,14 @@ export default function MediaUpload({
         let cleanUrl = getCleanUrl(item.url);
 
         // Construct Transformation String
-        // Order matters for some operations, generally: Trim -> Rotate -> Effect -> Resize/Crop
-        // Cloudinary processes chained transformations from left to right usually.
-
         let transformParts: string[] = [];
 
-        // 1. Trim (Start Offset / End Offset)
         if (transforms.startTime > 0) transformParts.push(`so_${transforms.startTime}`);
         if (transforms.endTime !== null) transformParts.push(`eo_${transforms.endTime}`);
-
-        // 2. Rotation
         if (transforms.rotation !== 0) transformParts.push(`a_${transforms.rotation}`);
-
-        // 3. Audio (Mute)
         if (transforms.isMuted) transformParts.push(`ac_none`);
 
-        // 4. Zoom (Center Crop)
-        // Logic: To zoom 2x, we crop to 50% width/height from center.
         if (transforms.zoom > 1) {
-            // Factor = 1 / zoom. E.g. Zoom 2x -> Width 0.5
-            // using relative width flags w_1.0 etc doesn't work well with c_crop always.
-            // Using "w_<1/zoom >" if using float flags might effectively zoom.
-            // Safest simple zoom: c_crop,g_center,w_<1/zoom>,h_<1/zoom> combined with implicit relative sizing (fl_relative_width not assumed everywhere).
-            // Actually, scaling UP `c_scale,w_...` makes it bigger but frame same.
-            // To ZOOM IN while keeping frame: Crop the center.
-            // "w_0.5,h_0.5,c_crop,g_center,fl_relative" is standard for 2x zoom.
             const decimal = (1 / transforms.zoom).toFixed(2);
             transformParts.push(`c_crop,g_center,w_${decimal},h_${decimal},fl_relative`);
         }
@@ -262,7 +379,6 @@ export default function MediaUpload({
         const item = newItems[croppingItemIndex];
         const cleanUrl = getCleanUrl(item.url);
 
-        // Build transformation string: Rotate first, then crop
         let transform = "";
         if (rotation !== 0) {
             transform += `a_${rotation}/`;
@@ -275,8 +391,6 @@ export default function MediaUpload({
         onChange(newItems);
         setCroppingItemIndex(null);
     };
-
-    const inputId = `media-input-${title.replace(/\s+/g, '-').toLowerCase()}-${Math.random().toString(36).slice(2, 7)}`;
 
     return (
         <div className="space-y-4">
@@ -306,7 +420,7 @@ export default function MediaUpload({
 
             {(items.length > 0 || pendingFiles.length > 0) && (
                 <div className="space-y-4 mb-4">
-                    {/* Main Photo Preview - Large, exactly like venue page */}
+                    {/* Main Photo Preview */}
                     {items.length > 0 && items[0] && (
                         <div className="relative group rounded-2xl overflow-hidden bg-zinc-800 border-2 border-indigo-500/50 shadow-xl">
                             <div className="absolute top-3 left-3 z-10 bg-indigo-600 text-white text-xs uppercase font-bold px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-2">
@@ -319,10 +433,39 @@ export default function MediaUpload({
                                 {items[0].type === 'video' && (
                                     <video src={items[0].url} className="h-full w-full object-cover" controls />
                                 )}
+                                {items[0].type === 'pdf' && (
+                                    <div className="h-full w-full relative bg-zinc-900">
+                                        {getPdfThumbnail(items[0].url) ? (
+                                            <img
+                                                src={getPdfThumbnail(items[0].url)!}
+                                                className="h-full w-full object-contain"
+                                                alt="PDF Preview"
+                                                onError={(e) => {
+                                                    // Fallback if thumbnail fails
+                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                    (e.target as HTMLImageElement).parentElement!.querySelector('.pdf-placeholder')!.classList.remove('hidden');
+                                                }}
+                                            />
+                                        ) : null}
+                                        <div className={`pdf-placeholder ${getPdfThumbnail(items[0].url) ? 'hidden' : ''} h-full w-full flex flex-col items-center justify-center text-white/50 shadow-inner`}>
+                                            <FileText className="w-20 h-20 mb-4 text-indigo-400" />
+                                            <p className="text-lg font-bold">PDF Document</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            {/* Hover Controls */}
                             <div className="absolute inset-x-0 bottom-0 p-3 flex justify-end gap-2 md:bg-gradient-to-t md:from-black/80 md:via-transparent md:to-transparent md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                                {items[0] && (
+                                {items[0].type === 'pdf' && (
+                                    <button
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleViewPdf(items[0].url); }}
+                                        type="button"
+                                        className="px-3 py-2 bg-indigo-600 text-white rounded-lg font-bold text-xs hover:bg-indigo-500 flex items-center gap-2 shadow-lg"
+                                    >
+                                        <ExternalLink size={14} />
+                                        <span>View PDF</span>
+                                    </button>
+                                )}
+                                {!disableEditing && items[0].type !== 'pdf' && (
                                     <button
                                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCroppingItemIndex(0); }}
                                         type="button"
@@ -340,9 +483,6 @@ export default function MediaUpload({
                                     <Trash2 size={14} />
                                 </button>
                             </div>
-                            <p className="absolute bottom-3 left-3 text-white/60 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                                This is exactly how your venue will appear on the explore page
-                            </p>
                         </div>
                     )}
 
@@ -363,69 +503,58 @@ export default function MediaUpload({
                                                     <video src={item.url} className="h-full w-full object-cover" />
                                                 )}
                                                 {item.type === 'pdf' && (
-                                                    <div className="h-full w-full flex flex-col items-center justify-center text-white/50 p-4 text-center">
-                                                        <FileText className="w-8 h-8 mb-2" />
-                                                        <span className="text-xs">PDF</span>
+                                                    <div className="h-full w-full bg-zinc-900 relative">
+                                                        {getPdfThumbnail(item.url) ? (
+                                                            <img
+                                                                src={getPdfThumbnail(item.url)!}
+                                                                className="h-full w-full object-cover"
+                                                                alt={`PDF Gallery ${actualIndex}`}
+                                                                onError={(e) => (e.target as HTMLImageElement).style.display = 'none'}
+                                                            />
+                                                        ) : (
+                                                            <div className="h-full w-full flex flex-col items-center justify-center text-white/50 p-4 text-center">
+                                                                <FileText className="w-8 h-8 mb-2" />
+                                                                <span className="text-xs">PDF</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
 
-                                            {/* Mobile Controls (Always Visible) */}
-                                            <div className="md:hidden absolute bottom-0 left-0 w-full bg-black/80 p-1.5 flex items-center gap-2">
+                                            {/* Mobile & Desktop Controls */}
+                                            <div className="absolute md:bg-black/70 inset-0 md:opacity-0 md:group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-2 p-2 bg-black/40">
                                                 <button
                                                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); makeMain(actualIndex); }}
                                                     type="button"
-                                                    className="flex-1 px-2 py-1.5 bg-indigo-600 rounded-md text-[10px] font-bold text-white flex items-center justify-center gap-1 active:scale-95 transition-transform"
+                                                    className="w-full px-2 py-1.5 bg-indigo-600 rounded-lg text-[10px] md:text-xs font-bold text-white hover:bg-indigo-500 flex items-center justify-center gap-1"
                                                 >
-                                                    ★ Main
-                                                </button>
-                                                {item.type !== 'pdf' && (
-                                                    <button
-                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCroppingItemIndex(actualIndex); }}
-                                                        type="button"
-                                                        className="p-1.5 bg-white/10 rounded-md text-white active:bg-white/20"
-                                                    >
-                                                        <Pencil size={12} />
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(actualIndex); }}
-                                                    type="button"
-                                                    className="p-1.5 bg-red-500/20 rounded-md text-red-200 active:bg-red-500/30"
-                                                >
-                                                    <Trash2 size={12} />
-                                                </button>
-                                            </div>
-
-                                            {/* Desktop Controls (Hover Only) */}
-                                            <div className="hidden md:flex absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex-col items-center justify-center gap-2 p-2">
-                                                <button
-                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); makeMain(actualIndex); }}
-                                                    type="button"
-                                                    className="w-full px-2 py-1.5 bg-indigo-600 rounded-lg text-xs font-bold text-white hover:bg-indigo-500 flex items-center justify-center gap-1"
-                                                >
-                                                    ★ Make Main
+                                                    ★ {window.innerWidth < 768 ? 'Main' : 'Make Main'}
                                                 </button>
                                                 <div className="flex gap-2 w-full">
-                                                    {item.type !== 'pdf' && (
+                                                    {item.type === 'pdf' && (
+                                                        <button
+                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleViewPdf(item.url); }}
+                                                            type="button"
+                                                            className="flex-1 p-1.5 bg-indigo-600/20 rounded-lg hover:bg-indigo-600/40 text-indigo-400 transition-colors flex items-center justify-center"
+                                                        >
+                                                            <ExternalLink size={14} />
+                                                        </button>
+                                                    )}
+                                                    {item.type !== 'pdf' && !disableEditing && (
                                                         <button
                                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCroppingItemIndex(actualIndex); }}
                                                             type="button"
-                                                            className="flex-1 p-1.5 bg-white/10 rounded-lg hover:bg-white/20 text-white transition-colors flex items-center justify-center gap-1"
-                                                            title="Adjust Frame"
+                                                            className="flex-1 p-1.5 bg-white/10 rounded-lg hover:bg-white/20 text-white transition-colors flex items-center justify-center"
                                                         >
                                                             <Pencil size={14} />
-                                                            <span className="text-xs">Edit</span>
                                                         </button>
                                                     )}
                                                     <button
                                                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(actualIndex); }}
                                                         type="button"
-                                                        className="flex-1 p-1.5 bg-red-500/20 rounded-lg hover:bg-red-500/40 text-red-200 transition-colors flex items-center justify-center gap-1"
-                                                        title="Delete"
+                                                        className="flex-1 p-1.5 bg-red-500/20 rounded-lg hover:bg-red-500/40 text-red-200 transition-colors flex items-center justify-center"
                                                     >
                                                         <Trash2 size={14} />
-                                                        <span className="text-xs">Delete</span>
                                                     </button>
                                                 </div>
                                             </div>
@@ -445,9 +574,6 @@ export default function MediaUpload({
                                         {p.type === 'image' && p.preview && (
                                             <img src={p.preview} className="h-full w-full object-cover" alt="Loading..." />
                                         )}
-                                        {(p.type === 'video' || (p.type === 'image' && !p.preview)) && (
-                                            <div className="h-full w-full bg-zinc-800" />
-                                        )}
                                         {p.type === 'pdf' && (
                                             <div className="h-full w-full flex flex-col items-center justify-center text-white/20 p-4">
                                                 <FileText className="w-8 h-8 mb-2" />
@@ -465,14 +591,15 @@ export default function MediaUpload({
                 </div>
             )}
 
-            <div
+            <label
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
+                htmlFor={inputId}
                 className={`relative w-full border-2 border-dashed border-white/10 rounded-xl p-8 hover:bg-white/5 hover:border-white/20 transition-all flex flex-col items-center justify-center gap-4 group cursor-pointer ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
-                onClick={() => document.getElementById(inputId)?.click()}
             >
                 <input
                     id={inputId}
+                    ref={fileInputRef}
                     type="file"
                     multiple
                     className="hidden"
@@ -484,14 +611,14 @@ export default function MediaUpload({
                     <Upload className={`w-8 h-8 text-white/50 group-hover:text-white/80 ${isUploading ? 'animate-bounce' : ''}`} />
                 </div>
 
-                <div className="text-center">
+                <div className="text-center pointer-events-none">
                     <h3 className="text-lg font-semibold text-white">
                         {isUploading ? "Uploading..." : title}
                     </h3>
                     <p className="text-white/40 text-sm mt-1">{description}</p>
                     <p className="text-white/20 text-xs mt-4 italic">Drag and drop here or click to browse</p>
                 </div>
-            </div>
+            </label>
         </div>
     );
 }
@@ -553,4 +680,122 @@ async function compressImage(file: File): Promise<File> {
         };
         reader.readAsDataURL(file);
     });
+}
+async function compressPdf(file: File): Promise<File> {
+    const startTime = Date.now();
+    console.log(`📄 Starting compression for ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+
+    try {
+        const { PDFLib, pdfjsLib } = await loadPdfLibs();
+        const arrayBuffer = await file.arrayBuffer();
+
+        // Load the PDF
+        const loadingTask = pdfjsLib.getDocument({
+            data: arrayBuffer,
+            useSystemFonts: true,
+            disableFontFace: true // Faster and more stable for simple rendering
+        });
+        const pdf = await loadingTask.promise;
+        console.log(`📄 PDF Loaded: ${pdf.numPages} pages`);
+
+        // Prepare output PDF
+        const outPdf = await PDFLib.PDFDocument.create();
+
+        // Process each page
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+
+            // Lower scale slightly (1.2 is roughly 120 DPI) to ensure we hit the 10MB target
+            const viewport = page.getViewport({ scale: 1.2 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            if (!context) continue;
+
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({ canvasContext: context, viewport }).promise;
+
+            // Convert to JPEG blob - more efficient than data URLs
+            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.75));
+            if (!blob) continue;
+
+            const imageArrayBuffer = await blob.arrayBuffer();
+            const image = await outPdf.embedJpg(imageArrayBuffer);
+
+            const { width, height } = image.scale(1.0);
+            const newPage = outPdf.addPage([width, height]);
+            newPage.drawImage(image, {
+                x: 0,
+                y: 0,
+                width,
+                height,
+            });
+
+            // Cleanup canvas to save memory
+            canvas.width = 0;
+            canvas.height = 0;
+        }
+
+        const pdfBytes = await outPdf.save();
+        const compressedFile = new File([pdfBytes], file.name, { type: 'application/pdf' });
+
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+        const finalSize = (compressedFile.size / 1024 / 1024).toFixed(2);
+        console.log(`✅ PDF Compressed in ${duration}s: ${finalSize}MB`);
+
+        if (compressedFile.size > 10 * 1024 * 1024) {
+            console.warn("⚠️ PDF still exceeds 10MB after compression!");
+        }
+
+        return compressedFile;
+    } catch (error: any) {
+        console.error("❌ Critical PDF compression error:", error);
+        // If it fails, return the original file as a fallback
+        return file;
+    }
+}
+async function convertPdfToImageFiles(file: File): Promise<File[]> {
+    const startTime = Date.now();
+    console.log(`📄 Converting PDF to Images: ${file.name}`);
+
+    try {
+        const { pdfjsLib } = await loadPdfLibs();
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({
+            data: arrayBuffer,
+            useSystemFonts: true,
+            disableFontFace: true
+        });
+        const pdf = await loadingTask.promise;
+        const imageFiles: File[] = [];
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale: 2.0 }); // Higher quality for menu conversion
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            if (!context) continue;
+
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({ canvasContext: context, viewport }).promise;
+
+            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+            if (blob) {
+                const nameBase = file.name.replace('.pdf', '');
+                imageFiles.push(new File([blob], `${nameBase}-page-${i}.jpg`, { type: 'image/jpeg' }));
+            }
+
+            canvas.width = 0;
+            canvas.height = 0;
+        }
+
+        console.log(`✅ Converted PDF to ${imageFiles.length} images in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
+        return imageFiles;
+    } catch (error) {
+        console.error("❌ PDF Conversion error:", error);
+        throw error;
+    }
 }

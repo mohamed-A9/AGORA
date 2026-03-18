@@ -5,20 +5,19 @@ import { useSession, signOut } from "next-auth/react";
 import { Menu, X, User, LayoutDashboard, Calendar, Store, LogOut, Settings } from "lucide-react";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import { useLang } from "@/components/LanguageContext";
 
 export default function Header() {
     const { data: session, status } = useSession();
     const [isOpen, setIsOpen] = useState(false);
     const pathname = usePathname();
+    const { lang, setLang, t } = useLang();
 
-    // Hide Header on specific pages for distinct focus or full-screen layout
     if (pathname === "/complete-profile" || pathname === "/verify-email") {
         return null;
     }
 
-    // Helper to close menu
     const close = () => setIsOpen(false);
-
     const role = (session?.user as any)?.role;
 
     return (
@@ -32,25 +31,23 @@ export default function Header() {
 
                     {/* Desktop Menu */}
                     <div className="hidden md:flex items-center gap-8">
-                        {/* Common Links - Hidden for Business */}
                         <Link href="/explore" className="text-white/70 hover:text-white font-semibold transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
-                            <span>Explore</span>
+                            <span>{t('explore')}</span>
                             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
                         </Link>
 
-                        {/* Role Based Links */}
                         {session && (
                             <>
                                 {role === 'USER' && (
                                     <>
                                         <Link href="/reservations" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                             <Calendar className="w-4 h-4" />
-                                            <span>Reservations</span>
+                                            <span>{t('reservations')}</span>
                                             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
                                         </Link>
                                         <Link href="/profile" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                             <User className="w-4 h-4" />
-                                            <span>Profile</span>
+                                            <span>{t('profile')}</span>
                                             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
                                         </Link>
                                     </>
@@ -58,7 +55,7 @@ export default function Header() {
                                 {role === 'ADMIN' && (
                                     <Link href="/admin" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                         <LayoutDashboard className="w-4 h-4" />
-                                        <span>Admin</span>
+                                        <span>{t('admin')}</span>
                                         <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-red-500 to-orange-500 group-hover:w-full transition-all duration-300"></span>
                                     </Link>
                                 )}
@@ -66,20 +63,20 @@ export default function Header() {
                                     <>
                                         <Link href="/business/reservations" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                             <Calendar className="w-4 h-4" />
-                                            <span>Reservations</span>
+                                            <span>{t('reservations')}</span>
                                             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
                                         </Link>
                                         <Link href="/business/events" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                             <Store className="w-4 h-4" />
-                                            <span>Events</span>
+                                            <span>{t('events')}</span>
                                             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
                                         </Link>
                                         <Link href="/business/my-venues" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                             <Store className="w-4 h-4" />
-                                            <span>My Venues</span>
+                                            <span>{t('myVenues')}</span>
                                             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
                                         </Link>
-                                        <Link href="/profile" title="Account Settings" className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
+                                        <Link href="/profile" title={t('settings')} className="text-white/70 hover:text-white font-semibold transition-all duration-300 flex items-center gap-2 hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] relative group">
                                             <Settings className="w-4 h-4 text-white/40" />
                                             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-zinc-500 group-hover:w-full transition-all duration-300"></span>
                                         </Link>
@@ -87,6 +84,23 @@ export default function Header() {
                                 )}
                             </>
                         )}
+
+                        {/* Language Toggle */}
+                        <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest">
+                            <button
+                                onClick={() => setLang('fr')}
+                                className={`px-2 py-0.5 rounded-full transition-all ${lang === 'fr' ? 'bg-indigo-500 text-white' : 'text-white/40 hover:text-white/70'}`}
+                            >
+                                FR
+                            </button>
+                            <span className="text-white/20">|</span>
+                            <button
+                                onClick={() => setLang('en')}
+                                className={`px-2 py-0.5 rounded-full transition-all ${lang === 'en' ? 'bg-indigo-500 text-white' : 'text-white/40 hover:text-white/70'}`}
+                            >
+                                EN
+                            </button>
+                        </div>
 
                         {/* Auth Section */}
                         {status === "loading" ? (
@@ -98,38 +112,49 @@ export default function Header() {
                                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600/20 to-purple-600/20 hover:from-indigo-600/30 hover:to-purple-600/30 text-white font-semibold transition-all duration-300 border border-indigo-500/20 hover:border-indigo-500/40 hover:scale-105 shadow-lg shadow-indigo-500/10"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
-                                    <span>Dashboard</span>
+                                    <span>{t('dashboard')}</span>
                                 </Link>
-
                                 <button
                                     onClick={() => signOut({ callbackUrl: '/' })}
                                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-gradient-to-r hover:from-red-600/20 hover:to-red-500/20 text-white/70 hover:text-red-400 font-semibold transition-all duration-300 border border-white/10 hover:border-red-500/40 hover:scale-105 group"
-                                    title="Sign out"
+                                    title={t('logout')}
                                 >
                                     <LogOut className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-                                    <span>Log out</span>
+                                    <span>{t('logout')}</span>
                                 </button>
                             </div>
                         ) : (
                             <div className="flex items-center gap-4 pl-4 border-l border-white/10">
-                                <Link
-                                    href="/login"
-                                    className="text-white hover:text-white/80 font-medium transition-colors"
-                                >
-                                    Log in
+                                <Link href="/login" className="text-white hover:text-white/80 font-medium transition-colors">
+                                    {t('login')}
                                 </Link>
                                 <Link
                                     href="/signup"
                                     className="bg-white text-black px-5 py-2.5 rounded-xl font-bold hover:bg-zinc-200 transition-colors shadow-lg hover:scale-105 transform duration-200"
                                 >
-                                    Sign up
+                                    {t('signup')}
                                 </Link>
                             </div>
                         )}
                     </div>
 
-                    {/* Mobile menu button */}
-                    <div className="md:hidden">
+                    {/* Mobile: language toggle + hamburger */}
+                    <div className="md:hidden flex items-center gap-3">
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase">
+                            <button
+                                onClick={() => setLang('fr')}
+                                className={`px-1.5 py-0.5 rounded-full transition-all ${lang === 'fr' ? 'bg-indigo-500 text-white' : 'text-white/40'}`}
+                            >
+                                FR
+                            </button>
+                            <span className="text-white/20">|</span>
+                            <button
+                                onClick={() => setLang('en')}
+                                className={`px-1.5 py-0.5 rounded-full transition-all ${lang === 'en' ? 'bg-indigo-500 text-white' : 'text-white/40'}`}
+                            >
+                                EN
+                            </button>
+                        </div>
                         <button
                             onClick={() => setIsOpen(!isOpen)}
                             className="text-white/70 hover:text-white p-2"
@@ -144,72 +169,40 @@ export default function Header() {
             {isOpen && (
                 <div className="md:hidden bg-black/95 backdrop-blur-xl border-b border-white/5">
                     <div className="px-4 pt-2 pb-6 space-y-2">
-                        <Link
-                            href="/explore"
-                            className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium"
-                            onClick={close}
-                        >
-                            Explore
+                        <Link href="/explore" className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium" onClick={close}>
+                            {t('explore')}
                         </Link>
 
                         {session ? (
                             <>
                                 {role === 'USER' && (
                                     <>
-                                        <Link
-                                            href="/reservations"
-                                            className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium"
-                                            onClick={close}
-                                        >
-                                            Mes Réservations
+                                        <Link href="/reservations" className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium" onClick={close}>
+                                            {t('reservations')}
                                         </Link>
-                                        <Link
-                                            href="/profile"
-                                            className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium"
-                                            onClick={close}
-                                        >
-                                            Profil & Préférences
+                                        <Link href="/profile" className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium" onClick={close}>
+                                            {t('profile')}
                                         </Link>
                                     </>
                                 )}
                                 {role === 'ADMIN' && (
-                                    <Link
-                                        href="/admin"
-                                        className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium"
-                                        onClick={close}
-                                    >
-                                        Admin Panel
+                                    <Link href="/admin" className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium" onClick={close}>
+                                        {t('admin')}
                                     </Link>
                                 )}
                                 {role === 'BUSINESS' && (
                                     <>
-                                        <Link
-                                            href="/business/reservations"
-                                            className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium"
-                                            onClick={close}
-                                        >
-                                            Réservations
+                                        <Link href="/business/reservations" className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium" onClick={close}>
+                                            {t('reservations')}
                                         </Link>
-                                        <Link
-                                            href="/business/events"
-                                            className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium"
-                                            onClick={close}
-                                        >
-                                            Soirées Spéciales
+                                        <Link href="/business/events" className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium" onClick={close}>
+                                            {t('events')}
                                         </Link>
-                                        <Link
-                                            href="/business/my-venues"
-                                            className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium"
-                                            onClick={close}
-                                        >
-                                            Mes Lieux
+                                        <Link href="/business/my-venues" className="block px-4 py-3 text-white/70 hover:text-white hover:bg-white/5 rounded-xl font-medium" onClick={close}>
+                                            {t('myVenues')}
                                         </Link>
-                                        <Link
-                                            href="/profile"
-                                            className="block px-4 py-3 text-white/40 hover:text-white hover:bg-white/5 rounded-xl font-medium flex items-center gap-2"
-                                            onClick={close}
-                                        >
-                                            <Settings className="w-4 h-4" /> Account Settings
+                                        <Link href="/profile" className="block px-4 py-3 text-white/40 hover:text-white hover:bg-white/5 rounded-xl font-medium flex items-center gap-2" onClick={close}>
+                                            <Settings className="w-4 h-4" /> {t('settings')}
                                         </Link>
                                     </>
                                 )}
@@ -219,31 +212,23 @@ export default function Header() {
                                     className="block px-4 py-3 text-indigo-400 hover:text-indigo-300 hover:bg-white/5 rounded-xl font-bold"
                                     onClick={close}
                                 >
-                                    Go to Dashboard
+                                    {t('dashboard')}
                                 </Link>
                                 <button
                                     onClick={() => { signOut(); close(); }}
                                     className="w-full flex items-center justify-center gap-2 px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl font-semibold border border-red-500/20 hover:border-red-500/40 transition-all duration-300"
                                 >
                                     <LogOut className="w-4 h-4" />
-                                    <span>Log out</span>
+                                    <span>{t('logout')}</span>
                                 </button>
                             </>
                         ) : (
                             <div className="grid grid-cols-2 gap-4 mt-4 px-2">
-                                <Link
-                                    href="/login"
-                                    className="flex items-center justify-center px-4 py-3 border border-white/10 rounded-xl text-white font-medium"
-                                    onClick={close}
-                                >
-                                    Log in
+                                <Link href="/login" className="flex items-center justify-center px-4 py-3 border border-white/10 rounded-xl text-white font-medium" onClick={close}>
+                                    {t('login')}
                                 </Link>
-                                <Link
-                                    href="/signup"
-                                    className="flex items-center justify-center px-4 py-3 bg-white text-black rounded-xl font-bold"
-                                    onClick={close}
-                                >
-                                    Sign up
+                                <Link href="/signup" className="flex items-center justify-center px-4 py-3 bg-white text-black rounded-xl font-bold" onClick={close}>
+                                    {t('signup')}
                                 </Link>
                             </div>
                         )}

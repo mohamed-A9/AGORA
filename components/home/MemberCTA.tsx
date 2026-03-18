@@ -53,16 +53,16 @@ export default function MemberCTA() {
                         {/* Integrated Stats Section */}
                         <div className="pt-8 border-t border-white/5 flex items-center justify-center gap-8 md:gap-16 text-white/40">
                             <div className="text-center">
-                                <p className="text-xl font-black text-white">20k+</p>
-                                <p className="text-[9px] font-bold tracking-widest uppercase">Explorers</p>
+                                <p className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Early</p>
+                                <p className="text-[9px] font-bold tracking-widest uppercase">Access</p>
                             </div>
                             <div className="text-center">
-                                <p className="text-xl font-black text-white">1k+</p>
-                                <p className="text-[9px] font-bold tracking-widest uppercase">Hidden Gems</p>
+                                <p className="text-xl font-black text-white">🇲🇦</p>
+                                <p className="text-[9px] font-bold tracking-widest uppercase">Maroc Only</p>
                             </div>
                             <div className="text-center">
-                                <p className="text-xl font-black text-white">5★</p>
-                                <p className="text-[9px] font-bold tracking-widest uppercase">Experiences</p>
+                                <p className="text-xl font-black text-white">Free</p>
+                                <p className="text-[9px] font-bold tracking-widest uppercase">Pour l'instant</p>
                             </div>
                         </div>
                     </div>

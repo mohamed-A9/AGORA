@@ -5,8 +5,8 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
 export const metadata = {
-  title: "AGORA",
-  description: "AGORA app",
+  title: "AGORA — Découvrez les meilleurs lieux au Maroc",
+  description: "Découvrez les meilleurs restaurants, bars, cafés et clubs du Maroc. Réservez votre table en ligne avec AGORA.",
 };
 
 export default function RootLayout({

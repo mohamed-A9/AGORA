@@ -53,21 +53,21 @@ export default function BusinessCTA() {
                         {/* Integrated Stats Section */}
                         <div className="pt-8 border-t border-white/5 flex items-center justify-center gap-8 md:gap-16">
                             <div className="text-center group/stat">
-                                <p className="text-xl font-black text-white">500+</p>
-                                <p className="text-[9px] font-bold text-white/30 tracking-widest uppercase">Venues</p>
+                                <p className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">BETA</p>
+                                <p className="text-[9px] font-bold text-white/30 tracking-widest uppercase">Lancement</p>
                             </div>
                             <div className="text-center group/stat">
-                                <p className="text-xl font-black text-white">20k+</p>
-                                <p className="text-[9px] font-bold text-white/30 tracking-widest uppercase">Users</p>
+                                <p className="text-xl font-black text-white">🇲🇦</p>
+                                <p className="text-[9px] font-bold text-white/30 tracking-widest uppercase">Maroc First</p>
                             </div>
                             <div className="text-center group/stat">
                                 <div className="relative inline-block">
-                                    <p className="text-xl font-black text-white">10+</p>
+                                    <p className="text-xl font-black text-white">∞</p>
                                     <span className="absolute -top-3 -right-6 px-1 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/20 text-[6px] font-black text-indigo-400">
                                         SOON
                                     </span>
                                 </div>
-                                <p className="text-[9px] font-bold text-white/30 tracking-widest uppercase">Cities</p>
+                                <p className="text-[9px] font-bold text-white/30 tracking-widest uppercase">Villes</p>
                             </div>
                         </div>
                     </div>

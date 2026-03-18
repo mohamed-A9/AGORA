@@ -7,7 +7,7 @@ import {
   ArrowLeft, MapPin, Globe, Phone, Share, Heart, X, ChevronLeft, ChevronRight,
   Play, FileText, Edit, Trash2, Star, User, Calendar, Utensils, ArrowRight,
   Instagram, Facebook, Music, Sparkles, CheckCircle2, ShieldCheck, Clock,
-  CreditCard, ExternalLink, MessageCircle, Navigation, Info
+  CreditCard, ExternalLink, Navigation, Info
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { deleteVenue } from "@/actions/venue";
@@ -42,6 +42,30 @@ export default function VenueDetailPage() {
 
   // Reservation Modal (Global)
   const [resModalOpen, setResModalOpen] = useState(false);
+
+  // Favorites
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [shareToast, setShareToast] = useState(false);
+
+  function handleShare() {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({ title: venue?.name, url });
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        setShareToast(true);
+        setTimeout(() => setShareToast(false), 2500);
+      });
+    }
+  }
+
+  function handleFavorite() {
+    if (!session) {
+      router.push(`/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+    setIsFavorited(prev => !prev);
+  }
 
   useEffect(() => {
     (async () => {
@@ -269,11 +293,15 @@ export default function VenueDetailPage() {
                   <div className="w-px h-8 bg-white/10 mx-1"></div>
                 </>
               )}
-              <button className="p-2 rounded-full hover:bg-white/10 transition-colors text-white">
+              <button onClick={handleShare} className="p-2 rounded-full hover:bg-white/10 transition-colors text-white" title="Partager">
                 <Share className="w-5 h-5" />
               </button>
-              <button className="p-2 rounded-full hover:bg-white/10 transition-colors text-white">
-                <Heart className="w-5 h-5" />
+              <button
+                onClick={handleFavorite}
+                className={`p-2 rounded-full transition-all ${isFavorited ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20' : 'text-white hover:bg-white/10'}`}
+                title={isFavorited ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+              >
+                <Heart className={`w-5 h-5 transition-all ${isFavorited ? 'fill-red-400 scale-110' : ''}`} />
               </button>
             </div>
           </div>
@@ -289,6 +317,13 @@ export default function VenueDetailPage() {
             <span>{venue.category}</span>
           </div>
         </div>
+
+        {/* Share toast */}
+        {shareToast && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[500] px-5 py-3 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 text-white text-sm font-bold shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
+            Lien copié !
+          </div>
+        )}
 
         {/* Hero Image Section */}
         <div className="relative grid grid-cols-1 md:grid-cols-4 gap-2 mb-10">
@@ -376,13 +411,15 @@ export default function VenueDetailPage() {
               );
             })}
           </div>
+          {visualMedia.length > 5 && (
+            <button
+              onClick={() => openLightbox(0)}
+              className="hidden md:flex absolute bottom-4 right-4 items-center gap-2 bg-white/90 backdrop-blur text-black px-4 py-2 rounded-xl text-sm font-semibold shadow-lg hover:scale-105 transition-transform z-10"
+            >
+              Voir toutes les photos ({visualMedia.length})
+            </button>
+          )}
         </div>
-        <button
-          onClick={() => openLightbox(0)}
-          className="absolute bottom-4 right-4 bg-white/90 backdrop-blur text-black px-4 py-2 rounded-lg text-sm font-semibold shadow-lg hover:scale-105 transition-transform"
-        >
-          Show all photos
-        </button>
 
         {/* Discovery Row: About, Presence & Location */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mt-10 mb-12">
@@ -413,7 +450,9 @@ export default function VenueDetailPage() {
                   )}
                   {venue.tiktokUrl && (
                     <a href={venue.tiktokUrl} target="_blank" className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all hover:scale-110 active:scale-95 group shadow-lg" title="TikTok">
-                      <MessageCircle className="w-6 h-6 text-cyan-400" />
+                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.78 1.52V6.75a4.85 4.85 0 01-1.01-.06z"/>
+                      </svg>
                     </a>
                   )}
                   {venue.facebookUrl && (

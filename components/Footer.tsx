@@ -2,9 +2,11 @@
 
 import { Mail, Phone } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useLang } from "@/components/LanguageContext";
 
 export default function Footer() {
     const pathname = usePathname();
+    const { t } = useLang();
 
     if (pathname === "/complete-profile" || pathname === "/verify-email") return null;
 
@@ -15,7 +17,7 @@ export default function Footer() {
                 {/* Brand / Logo (Optional text) */}
                 <div className="flex flex-col gap-2">
                     <h3 className="text-2xl font-bold text-white tracking-tighter">AGORA</h3>
-                    <p className="text-zinc-500 text-sm">Discover the best of Morocco</p>
+                    <p className="text-zinc-500 text-sm">{t('footerTagline')}</p>
                 </div>
 
                 {/* Contact Info */}

@@ -59,8 +59,8 @@ export default function Hero() {
           </Link>
         </div>
 
-        <div className="hidden md:flex flex-col items-center gap-4">
-          <div className="w-full max-w-3xl flex bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl animate-fade-in divide-x divide-white/5 p-1">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-full max-w-3xl flex flex-col md:flex-row bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl animate-fade-in divide-y md:divide-y-0 md:divide-x divide-white/5 p-1">
             <SearchDropdown
               label="What are you looking for?"
               placeholder="Select Vibe"
@@ -79,10 +79,10 @@ export default function Hero() {
               icon={<MapPin className="w-5 h-5" />}
             />
 
-            <div className="flex items-center px-4">
+            <div className="flex items-center px-4 py-2 md:py-0">
               <button
                 onClick={handleSearch}
-                className="px-10 h-14 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-lg shadow-indigo-500/20"
+                className="w-full md:w-auto px-10 h-14 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-lg shadow-indigo-500/20"
               >
                 Discover
               </button>

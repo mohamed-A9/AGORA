@@ -28,7 +28,7 @@ interface VirtualTourViewerProps {
 }
 
 type SlideDir = 'up' | 'down' | 'left' | 'right' | 'fade';
-type AnimState = 'idle' | 'exit' | 'enter';
+type AnimState = 'idle' | 'exit';
 
 // Convert rotation degrees to closest slide direction
 function rotationToDir(rotation: number): SlideDir {
@@ -101,21 +101,19 @@ export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTo
         animating.current = true;
         pendingScene.current = targetId;
 
+        // Both exit and enter move in the SAME direction (push effect)
+        // Arrow LEFT → both slide from right; Arrow RIGHT → both slide from left
         const opp = oppositeDir(dir);
-        setExitDir(dir);
+        setExitDir(opp);
         setEnterDir(opp);
         setAnimState('exit');
 
-        // After exit: swap scene + trigger enter
+        // After exit: swap scene instantly (no entry animation)
         setTimeout(() => {
             setCurrentSceneId(targetId);
             setDisplaySceneId(targetId);
-            setAnimState('enter');
-            // After enter: back to idle
-            setTimeout(() => {
-                setAnimState('idle');
-                animating.current = false;
-            }, 420);
+            setAnimState('idle');
+            animating.current = false;
         }, 350);
     }, [currentSceneId]);
 
@@ -124,11 +122,10 @@ export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTo
     const currentScene = scenes.find(s => s.id === (displaySceneId || scenes[0].id));
     const navHotspots = currentScene?.hotspots.filter(h => h.type === 'navigation' && h.targetSceneId) || [];
 
-    const imageClass = (() => {
-        if (animState === 'exit') return `${exitClass(exitDir)} opacity-0`;
-        if (animState === 'enter') return `${enterStartClass(enterDir)}`;
-        return 'translate-x-0 translate-y-0 opacity-100 scale-100';
-    })();
+    // Only exit is animated — new photo appears instantly
+    const imageClass = animState === 'exit'
+        ? `${exitClass(exitDir)} opacity-0`
+        : 'translate-x-0 translate-y-0 opacity-100 scale-100';
 
     return (
         <div className="fixed inset-0 z-[300] bg-black flex flex-col overflow-hidden animate-in fade-in duration-300">
@@ -167,7 +164,7 @@ export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTo
                     >
                         <img
                             src={currentScene.image}
-                            className="w-full h-full object-cover select-none pointer-events-none"
+                            className="w-full h-full object-contain select-none pointer-events-none"
                             alt={currentScene.name}
                             draggable={false}
                         />
@@ -203,10 +200,12 @@ export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTo
                                         }}
                                         aria-label={`Navigate to ${targetScene?.name}`}
                                     >
-                                        {/* Pulse ring */}
-                                        <div className={`absolute inset-0 rounded-full bg-cyan-400/30 animate-ping ${isHovered ? 'opacity-60' : 'opacity-30'}`}
-                                            style={{ width: 56, height: 56, margin: -4 }}
-                                        />
+                                        {/* Subtle static glow — no pulse */}
+                                        {isHovered && (
+                                            <div className="absolute rounded-full bg-cyan-400/20"
+                                                style={{ width: 56, height: 56, margin: -4, inset: 0 }}
+                                            />
+                                        )}
 
                                         {/* Arrow container */}
                                         <div
@@ -261,46 +260,29 @@ export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTo
                 )}
             </div>
 
-            {/* Bottom: Scene strip */}
-            <div className="absolute bottom-0 inset-x-0 z-50 p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
-                <div className="flex justify-center">
-                    <div className="flex gap-2 p-1.5 rounded-[2rem] bg-black/60 backdrop-blur-2xl border border-white/10 overflow-x-auto max-w-full" style={{ scrollbarWidth: 'none' }}>
-                        {scenes.map((scene, idx) => {
-                            const isActive = scene.id === (displaySceneId || scenes[0].id);
-                            return (
-                                <button
-                                    key={scene.id}
-                                    onClick={() => handleNavigate(scene.id, 'fade')}
-                                    className={`relative shrink-0 rounded-2xl overflow-hidden border-2 transition-all duration-300 ${isActive
-                                            ? 'border-cyan-400 scale-105 shadow-[0_0_12px_rgba(34,211,238,0.5)]'
-                                            : 'border-transparent opacity-50 hover:opacity-80 hover:border-white/30'
-                                        }`}
-                                    style={{ width: 72, height: 48 }}
-                                    title={scene.name}
-                                >
-                                    <img src={scene.image} className="w-full h-full object-cover" alt={scene.name} />
-                                    <div className="absolute inset-0 bg-black/20" />
-                                    {isActive && (
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="bg-cyan-400 text-black p-1 rounded-full shadow-lg">
-                                                <Navigation className="w-2.5 h-2.5 fill-current" />
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1">
-                                        <p className="text-[8px] text-white/80 font-bold uppercase tracking-widest truncate text-center">{scene.name}</p>
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Scene count indicator */}
-                <div className="flex justify-center mt-2">
-                    <span className="text-[10px] text-white/30 font-black uppercase tracking-widest">
-                        {scenes.findIndex(s => s.id === displaySceneId) + 1} / {scenes.length}
-                    </span>
+            {/* Top: Scene strip (no text, images only) */}
+            <div className="absolute top-16 inset-x-0 z-40 flex justify-center px-4 pointer-events-none">
+                <div className="pointer-events-auto flex gap-2 p-1.5 rounded-2xl bg-black/50 backdrop-blur-xl border border-white/10 overflow-x-auto max-w-full" style={{ scrollbarWidth: 'none' }}>
+                    {scenes.map((scene) => {
+                        const isActive = scene.id === (displaySceneId || scenes[0].id);
+                        return (
+                            <button
+                                key={scene.id}
+                                onClick={() => handleNavigate(scene.id, 'fade')}
+                                className={`relative shrink-0 rounded-xl overflow-hidden border-2 transition-all duration-300 ${isActive
+                                        ? 'border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)]'
+                                        : 'border-transparent opacity-40 hover:opacity-70 hover:border-white/30'
+                                    }`}
+                                style={{ width: 56, height: 38 }}
+                                title={scene.name}
+                            >
+                                <img src={scene.image} className="w-full h-full object-cover" alt={scene.name} />
+                                {isActive && (
+                                    <div className="absolute inset-0 border border-cyan-400/40" />
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
         </div>

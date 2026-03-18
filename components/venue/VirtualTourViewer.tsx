@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { X, Navigation, ChevronDown } from "lucide-react";
+import { X, Navigation } from "lucide-react";
 import { useLang } from "@/components/LanguageContext";
 
 interface Hotspot {
@@ -30,7 +30,6 @@ interface VirtualTourViewerProps {
 type SlideDir = 'up' | 'down' | 'left' | 'right' | 'fade';
 type AnimState = 'idle' | 'exit';
 
-// Convert rotation degrees to closest slide direction
 function rotationToDir(rotation: number): SlideDir {
     const r = ((rotation % 360) + 360) % 360;
     if (r >= 315 || r < 45) return 'up';
@@ -47,7 +46,6 @@ function oppositeDir(d: SlideDir): SlideDir {
     return 'fade';
 }
 
-// CSS classes for slide out
 function exitClass(dir: SlideDir): string {
     if (dir === 'up') return 'translate-y-[-100%] scale-[1.05]';
     if (dir === 'down') return 'translate-y-[100%] scale-[1.05]';
@@ -56,14 +54,7 @@ function exitClass(dir: SlideDir): string {
     return 'opacity-0 scale-[1.05]';
 }
 
-// CSS classes for enter (start position)
-function enterStartClass(dir: SlideDir): string {
-    if (dir === 'up') return 'translate-y-[100%]';
-    if (dir === 'down') return 'translate-y-[-100%]';
-    if (dir === 'left') return 'translate-x-[100%]';
-    if (dir === 'right') return 'translate-x-[-100%]';
-    return 'opacity-0';
-}
+interface ImgRect { left: number; top: number; width: number; height: number; }
 
 export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTourViewerProps) {
     const { t } = useLang();
@@ -71,11 +62,42 @@ export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTo
     const [displaySceneId, setDisplaySceneId] = useState<string | null>(null);
     const [animState, setAnimState] = useState<AnimState>('idle');
     const [exitDir, setExitDir] = useState<SlideDir>('fade');
-    const [enterDir, setEnterDir] = useState<SlideDir>('fade');
     const [hoveredArrowId, setHoveredArrowId] = useState<string | null>(null);
     const [clickedArrowId, setClickedArrowId] = useState<string | null>(null);
-    const pendingScene = useRef<string | null>(null);
+    const [imgRect, setImgRect] = useState<ImgRect | null>(null);
     const animating = useRef(false);
+    const imgRef = useRef<HTMLImageElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Measure actual rendered image bounds (accounts for object-contain letterboxing)
+    const measureImage = useCallback(() => {
+        const img = imgRef.current;
+        const container = containerRef.current;
+        if (!img || !container || !img.naturalWidth || !img.naturalHeight) return;
+
+        const cW = container.clientWidth;
+        const cH = container.clientHeight;
+        const nW = img.naturalWidth;
+        const nH = img.naturalHeight;
+        const imgRatio = nW / nH;
+        const containerRatio = cW / cH;
+
+        let iW: number, iH: number, iL: number, iT: number;
+        if (imgRatio > containerRatio) {
+            // Wider image: fits to container width, letterboxed top/bottom
+            iW = cW;
+            iH = cW / imgRatio;
+            iL = 0;
+            iT = (cH - iH) / 2;
+        } else {
+            // Taller image: fits to container height, pillarboxed left/right
+            iH = cH;
+            iW = cH * imgRatio;
+            iL = (cW - iW) / 2;
+            iT = 0;
+        }
+        setImgRect({ left: iL, top: iT, width: iW, height: iH });
+    }, []);
 
     // Init on open
     useEffect(() => {
@@ -83,6 +105,7 @@ export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTo
             setCurrentSceneId(scenes[0].id);
             setDisplaySceneId(scenes[0].id);
             setAnimState('idle');
+            setImgRect(null);
         }
     }, [isOpen, scenes]);
 
@@ -96,19 +119,27 @@ export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTo
         return () => { document.body.style.overflow = ''; };
     }, [isOpen]);
 
+    // Re-measure on resize
+    useEffect(() => {
+        if (!isOpen) return;
+        window.addEventListener('resize', measureImage);
+        return () => window.removeEventListener('resize', measureImage);
+    }, [isOpen, measureImage]);
+
+    // Reset measurement when scene changes
+    useEffect(() => {
+        setImgRect(null);
+    }, [displaySceneId]);
+
     const handleNavigate = useCallback((targetId: string, dir: SlideDir) => {
         if (animating.current || targetId === currentSceneId) return;
         animating.current = true;
-        pendingScene.current = targetId;
 
-        // Both exit and enter move in the SAME direction (push effect)
-        // Arrow LEFT → both slide from right; Arrow RIGHT → both slide from left
         const opp = oppositeDir(dir);
         setExitDir(opp);
-        setEnterDir(opp);
         setAnimState('exit');
+        setImgRect(null);
 
-        // After exit: swap scene instantly (no entry animation)
         setTimeout(() => {
             setCurrentSceneId(targetId);
             setDisplaySceneId(targetId);
@@ -122,7 +153,6 @@ export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTo
     const currentScene = scenes.find(s => s.id === (displaySceneId || scenes[0].id));
     const navHotspots = currentScene?.hotspots.filter(h => h.type === 'navigation' && h.targetSceneId) || [];
 
-    // Only exit is animated — new photo appears instantly
     const imageClass = animState === 'exit'
         ? `${exitClass(exitDir)} opacity-0`
         : 'translate-x-0 translate-y-0 opacity-100 scale-100';
@@ -156,111 +186,113 @@ export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTo
             </div>
 
             {/* Main image stage */}
-            <div className="flex-1 relative overflow-hidden">
+            <div ref={containerRef} className="flex-1 relative overflow-hidden">
                 {currentScene && (
                     <div
                         className={`absolute inset-0 transition-all duration-[380ms] ease-in-out ${imageClass}`}
                         style={{ willChange: 'transform, opacity' }}
                     >
                         <img
+                            ref={imgRef}
                             src={currentScene.image}
                             className="w-full h-full object-contain select-none pointer-events-none"
                             alt={currentScene.name}
                             draggable={false}
+                            onLoad={measureImage}
                         />
 
-                        {/* Dark vignette overlay for depth */}
+                        {/* Dark vignette overlay */}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20 pointer-events-none" />
 
-                        {/* Navigation Arrows Layer */}
-                        <div className="absolute inset-0 z-20">
-                            {navHotspots.map(spot => {
-                                const targetScene = scenes.find(s => s.id === spot.targetSceneId);
-                                const dir = rotationToDir(spot.rotation || 0);
-                                const isHovered = hoveredArrowId === spot.id;
-                                const isClicked = clickedArrowId === spot.id;
+                        {/* Navigation Arrows — positioned over actual image area, not the full container */}
+                        {imgRect && navHotspots.map(spot => {
+                            const targetScene = scenes.find(s => s.id === spot.targetSceneId);
+                            const dir = rotationToDir(spot.rotation || 0);
+                            const isHovered = hoveredArrowId === spot.id;
+                            const isClicked = clickedArrowId === spot.id;
 
-                                return (
-                                    <button
-                                        key={spot.id}
-                                        className="absolute group"
-                                        style={{
-                                            left: `${spot.x}%`,
-                                            top: `${spot.y}%`,
-                                            transform: 'translate(-50%, -50%)',
-                                            zIndex: isHovered ? 30 : 20,
-                                        }}
-                                        onMouseEnter={() => setHoveredArrowId(spot.id)}
-                                        onMouseLeave={() => setHoveredArrowId(null)}
-                                        onClick={() => {
-                                            if (!spot.targetSceneId) return;
-                                            setClickedArrowId(spot.id);
-                                            setTimeout(() => setClickedArrowId(null), 400);
-                                            handleNavigate(spot.targetSceneId, dir);
-                                        }}
-                                        aria-label={`Navigate to ${targetScene?.name}`}
+                            // Convert spot % coords to pixel positions within the real image area
+                            const px = imgRect.left + (spot.x / 100) * imgRect.width;
+                            const py = imgRect.top + (spot.y / 100) * imgRect.height;
+
+                            return (
+                                <button
+                                    key={spot.id}
+                                    className="absolute group"
+                                    style={{
+                                        left: px,
+                                        top: py,
+                                        transform: 'translate(-50%, -50%)',
+                                        zIndex: isHovered ? 30 : 20,
+                                    }}
+                                    onMouseEnter={() => setHoveredArrowId(spot.id)}
+                                    onMouseLeave={() => setHoveredArrowId(null)}
+                                    onClick={() => {
+                                        if (!spot.targetSceneId) return;
+                                        setClickedArrowId(spot.id);
+                                        setTimeout(() => setClickedArrowId(null), 400);
+                                        handleNavigate(spot.targetSceneId, dir);
+                                    }}
+                                    aria-label={`Navigate to ${targetScene?.name}`}
+                                >
+                                    {/* Hover glow */}
+                                    {isHovered && (
+                                        <div className="absolute rounded-full bg-cyan-400/20"
+                                            style={{ width: 56, height: 56, margin: -4, inset: 0 }}
+                                        />
+                                    )}
+
+                                    {/* Arrow button */}
+                                    <div
+                                        className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 shadow-2xl border-2
+                                            ${isClicked
+                                                ? 'scale-90 bg-cyan-400/70 border-cyan-300'
+                                                : isHovered
+                                                    ? 'scale-125 bg-cyan-400/40 border-cyan-400 shadow-[0_0_24px_rgba(34,211,238,0.6)]'
+                                                    : 'scale-100 bg-white/15 border-white/40 backdrop-blur-md shadow-[0_0_16px_rgba(255,255,255,0.15)]'
+                                            }`}
+                                        style={{ transform: `rotate(${spot.rotation || 0}deg)` }}
                                     >
-                                        {/* Subtle static glow — no pulse */}
-                                        {isHovered && (
-                                            <div className="absolute rounded-full bg-cyan-400/20"
-                                                style={{ width: 56, height: 56, margin: -4, inset: 0 }}
+                                        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" className="drop-shadow-lg">
+                                            <path
+                                                d="M11 3L4 14h5v5h4v-5h5L11 3z"
+                                                fill={isHovered || isClicked ? 'rgb(34,211,238)' : 'white'}
+                                                opacity={isHovered || isClicked ? 1 : 0.9}
                                             />
-                                        )}
+                                        </svg>
+                                    </div>
 
-                                        {/* Arrow container */}
+                                    {/* Tooltip */}
+                                    {isHovered && targetScene && (
                                         <div
-                                            className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 shadow-2xl border-2
-                                                ${isClicked
-                                                    ? 'scale-90 bg-cyan-400/70 border-cyan-300'
-                                                    : isHovered
-                                                        ? 'scale-125 bg-cyan-400/40 border-cyan-400 shadow-[0_0_24px_rgba(34,211,238,0.6)]'
-                                                        : 'scale-100 bg-white/15 border-white/40 backdrop-blur-md shadow-[0_0_16px_rgba(255,255,255,0.15)]'
-                                                }`}
-                                            style={{ transform: `rotate(${spot.rotation || 0}deg)` }}
+                                            className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 pointer-events-none z-50 animate-in fade-in zoom-in-95 duration-150"
+                                            style={{ transform: `translateX(-50%) rotate(-${spot.rotation || 0}deg)` }}
                                         >
-                                            {/* Arrow SVG — always points up, rotation applied via parent */}
-                                            <svg width="22" height="22" viewBox="0 0 22 22" fill="none" className="drop-shadow-lg">
-                                                <path
-                                                    d="M11 3L4 14h5v5h4v-5h5L11 3z"
-                                                    fill={isHovered || isClicked ? 'rgb(34,211,238)' : 'white'}
-                                                    opacity={isHovered || isClicked ? 1 : 0.9}
-                                                />
-                                            </svg>
-                                        </div>
-
-                                        {/* Tooltip with scene name + thumbnail */}
-                                        {isHovered && targetScene && (
-                                            <div
-                                                className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 pointer-events-none z-50 animate-in fade-in zoom-in-95 duration-150"
-                                                style={{ transform: `translateX(-50%) rotate(-${spot.rotation || 0}deg)` }}
-                                            >
-                                                <div className="bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl min-w-[120px]">
-                                                    {targetScene.image && (
-                                                        <img
-                                                            src={targetScene.image}
-                                                            alt={targetScene.name}
-                                                            className="w-full h-16 object-cover"
-                                                        />
-                                                    )}
-                                                    <div className="px-3 py-2 text-center">
-                                                        <span className="text-white text-[11px] font-black uppercase tracking-widest whitespace-nowrap">
-                                                            {targetScene.name}
-                                                        </span>
-                                                    </div>
+                                            <div className="bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl min-w-[120px]">
+                                                {targetScene.image && (
+                                                    <img
+                                                        src={targetScene.image}
+                                                        alt={targetScene.name}
+                                                        className="w-full h-16 object-cover"
+                                                    />
+                                                )}
+                                                <div className="px-3 py-2 text-center">
+                                                    <span className="text-white text-[11px] font-black uppercase tracking-widest whitespace-nowrap">
+                                                        {targetScene.name}
+                                                    </span>
                                                 </div>
-                                                {/* Triangle pointer */}
-                                                <div className="w-0 h-0 mx-auto border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-white/20" />
                                             </div>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                                            <div className="w-0 h-0 mx-auto border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-white/20" />
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 )}
             </div>
 
-            {/* Top: Scene strip (no text, images only) */}
+            {/* Scene strip — top, thumbnails only */}
             <div className="absolute top-16 inset-x-0 z-40 flex justify-center px-4 pointer-events-none">
                 <div className="pointer-events-auto flex gap-2 p-1.5 rounded-2xl bg-black/50 backdrop-blur-xl border border-white/10 overflow-x-auto max-w-full" style={{ scrollbarWidth: 'none' }}>
                     {scenes.map((scene) => {
@@ -270,8 +302,8 @@ export default function VirtualTourViewer({ scenes, isOpen, onClose }: VirtualTo
                                 key={scene.id}
                                 onClick={() => handleNavigate(scene.id, 'fade')}
                                 className={`relative shrink-0 rounded-xl overflow-hidden border-2 transition-all duration-300 ${isActive
-                                        ? 'border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)]'
-                                        : 'border-transparent opacity-40 hover:opacity-70 hover:border-white/30'
+                                    ? 'border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)]'
+                                    : 'border-transparent opacity-40 hover:opacity-70 hover:border-white/30'
                                     }`}
                                 style={{ width: 56, height: 38 }}
                                 title={scene.name}

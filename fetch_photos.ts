@@ -1,6 +1,6 @@
-﻿import { prisma } from './lib/prisma';
+import { prisma } from './lib/prisma';
 
-const API_KEY = 'AIzaSyDpDGCDSARFHFjBAodEzKWh4fXRO2itQz0';
+const API_KEY = 'process.env.GOOGLE_PLACES_API_KEY!';
 
 async function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
@@ -15,7 +15,7 @@ async function getPlacePhoto(venueName: string): Promise<string | null> {
     const searchData = await searchRes.json();
     
     if (searchData.status !== 'OK' || !searchData.candidates?.length) {
-      console.log('  Pas de résultat pour: ' + venueName);
+      console.log('  Pas de r�sultat pour: ' + venueName);
       return null;
     }
 
@@ -44,7 +44,7 @@ async function getPlacePhoto(venueName: string): Promise<string | null> {
 }
 
 async function main() {
-  console.log('🔍 Fetching real photos from Google Places...\n');
+  console.log('?? Fetching real photos from Google Places...\n');
   
   const venues = await prisma.venue.findMany({
     where: { city: { slug: 'casablanca' } },
@@ -63,16 +63,16 @@ async function main() {
         where: { id: venue.id },
         data: { coverImageUrl: photoUrl }
       });
-      console.log(`  ✅ Photo updated!`);
+      console.log(`  ? Photo updated!`);
       updated++;
     } else {
-      console.log(`  ⚠️ No photo found`);
+      console.log(`  ?? No photo found`);
     }
     
     await sleep(500);
   }
 
-  console.log(`\n🎉 Done! ${updated}/${venues.length} venues updated with real photos.`);
+  console.log(`\n?? Done! ${updated}/${venues.length} venues updated with real photos.`);
   await prisma.$disconnect();
 }
 

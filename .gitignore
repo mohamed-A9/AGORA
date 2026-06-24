@@ -42,3 +42,10 @@ next-env.d.ts
 
 /app/generated/prisma
 .env
+
+.claude/
+fetch_photos.ts
+list_venues.ts
+update_photos.ts
+prisma/seed-casablanca.ts
+*.xlsx

@@ -28,14 +28,19 @@ export async function PATCH(
       data.approvedBy = token.email || "ADMIN";
       data.rejectionReason = null;
       data.isVerified = true;
+      data.isActive = true; // Make visible in Explore immediately
     } else if (status === "REJECTED") {
       data.rejectionReason = rejectionReason;
       data.isVerified = false;
+      data.isActive = false; // Hide from Explore
       data.approvedAt = null;
       data.approvedBy = null;
+    } else if (status === "SUSPENDED") {
+      data.isActive = false; // Hide from Explore
     } else if (status === "PENDING_APPROVAL" || status === "PENDING") {
       data.status = "PENDING_APPROVAL"; // Normalize to PENDING_APPROVAL
       data.rejectionReason = null;
+      data.isActive = false; // Not yet visible
     }
 
     const updated = await prisma.venue.update({
@@ -62,7 +67,7 @@ export async function PATCH(
         type = "ERROR";
       }
 
-      if (title && (prisma as any).notification) {
+      if (ownerId && title && (prisma as any).notification) {
         await (prisma as any).notification.create({
           data: {
             userId: ownerId,

@@ -164,6 +164,8 @@ model Venue {
   tags                VenueTag[]
   vibes               VenueVibe[]
   wizardStep          Int?               @default(1)      // Track wizard progress
+  approvedAt          DateTime?
+  approvedBy          String?
 
   @@index([cityId])
   @@index([mainCategory])

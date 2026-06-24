@@ -26,9 +26,8 @@ export async function GET(req: Request) {
   if (q) {
     where.OR = [
       { name: { contains: q, mode: "insensitive" } },
-      { city: { contains: q, mode: "insensitive" } },
-      { category: { contains: q, mode: "insensitive" } },
       { address: { contains: q, mode: "insensitive" } },
+      { city: { name: { contains: q, mode: "insensitive" } } },
       { owner: { email: { contains: q, mode: "insensitive" } } },
       { owner: { phone: { contains: q, mode: "insensitive" } } },
       { owner: { name: { contains: q, mode: "insensitive" } } },
@@ -37,7 +36,7 @@ export async function GET(req: Request) {
 
   const venues = await prisma.venue.findMany({
     where,
-    // orderBy: { createdAt: "desc" }, // Temporarily disabled due to schema mismatch
+    orderBy: { createdAt: "desc" },
     include: {
       owner: {
         select: { id: true, email: true, phone: true, name: true, role: true },

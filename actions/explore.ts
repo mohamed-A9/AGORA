@@ -126,6 +126,7 @@ export async function getExploreData(searchParams: { [key: string]: string | str
 
         const where: Prisma.VenueWhereInput = {
             isActive: true, // Show only active
+            status: { in: ["APPROVED", "LIVE"] }, // Only approved or live venues
         };
 
         // 1. City

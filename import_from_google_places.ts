@@ -215,7 +215,7 @@ function parseOpeningHours(weekdayText?: string[]): any[] {
         }
     }
 
-    return schedule.length === 7 ? schedule : null;
+    return schedule.length === 7 ? schedule : parseOpeningHours(); // fallback to default
 }
 
 function getPhotoUrl(photoReference: string, maxWidth: number = 800): string {
